@@ -1,8 +1,12 @@
 <script lang="ts">
-	let { label, onClick, isSorted = false } = $props<{
+	let {
+		label,
+		onClick,
+		isSorted = false
+	} = $props<{
 		label: string;
 		onClick: ((event: MouseEvent) => void) | undefined;
-		isSorted?: false | "asc" | "desc";
+		isSorted?: false | 'asc' | 'desc';
 	}>();
 </script>
 
@@ -13,6 +17,6 @@
 >
 	<span>{label}</span>
 	{#if isSorted}
-		<span>{isSorted === "desc" ? "↓" : "↑"}</span>
+		<span>{isSorted === 'desc' ? '↓' : '↑'}</span>
 	{/if}
 </button>

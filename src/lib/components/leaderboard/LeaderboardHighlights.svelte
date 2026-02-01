@@ -1,9 +1,9 @@
 <script lang="ts">
-	import * as Card from "$lib/components/ui/card";
-	import * as Skeleton from "$lib/components/ui/skeleton";
-	import * as Empty from "$lib/components/ui/empty";
-	import { Badge } from "$lib/components/ui/badge";
-	import type { ClanLeaderboardEntry } from "$lib/types/openfront";
+	import * as Card from '$lib/components/ui/card';
+	import * as Skeleton from '$lib/components/ui/skeleton';
+	import * as Empty from '$lib/components/ui/empty';
+	import { Badge } from '$lib/components/ui/badge';
+	import type { ClanLeaderboardEntry } from '$lib/types/openfront';
 
 	let {
 		isLoading = false,
@@ -13,7 +13,7 @@
 		formatNumber,
 		formatRatio,
 		formatPercent,
-		getWinRate,
+		getWinRate
 	} = $props<{
 		isLoading?: boolean;
 		topEntries?: ClanLeaderboardEntry[];
@@ -28,7 +28,7 @@
 
 <section class="mt-0 grid gap-4 lg:grid-cols-3">
 	{#if isLoading}
-		{#each Array(3) as _, idx (idx)}
+		{#each Array.from({ length: 3 }, (_, idx) => idx) as idx (idx)}
 			<Card.Root>
 				<Card.Header>
 					<Skeleton.Root class="h-6 w-24" />
@@ -55,29 +55,29 @@
 		{#each topEntries as clan, index (clan.clanTag)}
 			<Card.Root
 				class="rank-card relative overflow-visible"
-				style={`--rank-accent: ${rankAccentColors[index] ?? "0 0 0"}`}
+				style={`--rank-accent: ${rankAccentColors[index] ?? '0 0 0'}`}
 			>
 				<div class="rank-card-glow" aria-hidden="true"></div>
 				{#if rankImages[index]}
 					<img
 						src={rankImages[index]}
 						alt={`Rank ${index + 1} accent`}
-						class="rank-accent pointer-events-none absolute left-1/2 top-0 h-14 w-14 -translate-x-1/2 -translate-y-1/2"
+						class="rank-accent pointer-events-none absolute top-0 left-1/2 h-14 w-14 -translate-x-1/2 -translate-y-1/2"
 						loading="lazy"
 					/>
 				{/if}
 				<Card.Header class="gap-2">
 					<div class="flex items-center justify-between">
 						<Badge
-							variant={index === 0 ? "default" : "secondary"}
-							style={`--rank-accent: ${rankAccentColors[index] ?? "0 0 0"}`}
+							variant={index === 0 ? 'default' : 'secondary'}
+							style={`--rank-accent: ${rankAccentColors[index] ?? '0 0 0'}`}
 							class="rank-badge"
 						>
 							#{index + 1}
 						</Badge>
 						<Badge
 							variant="outline"
-							style={`--rank-accent: ${rankAccentColors[index] ?? "0 0 0"}`}
+							style={`--rank-accent: ${rankAccentColors[index] ?? '0 0 0'}`}
 							class="rank-tag"
 						>
 							{clan.clanTag}

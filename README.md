@@ -11,10 +11,10 @@ pnpm dev
 
 ## Credits
 
-| Item | Details |
-| --- | --- |
-| Images | Most have been made with GPT Image 1.5 and modified after generation. |
-| Code | Writen with GPT 5.2 Codex (Low & High). Far from one-shot. Used 264 OpenAI credits. |
+| Item   | Details                                                                             |
+| ------ | ----------------------------------------------------------------------------------- |
+| Images | Most have been made with GPT Image 1.5 and modified after generation.               |
+| Code   | Writen with GPT 5.2 Codex (Low & High). Far from one-shot. Used 301 OpenAI credits. |
 
 ## Scripts
 

@@ -1,22 +1,22 @@
 <script lang="ts">
-	import * as Button from "$lib/components/ui/button";
-	import * as Input from "$lib/components/ui/input";
-	import * as Popover from "$lib/components/ui/popover";
-	import { Badge } from "$lib/components/ui/badge";
-	import { mode, toggleMode } from "mode-watcher";
-	import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
-	import CalendarRangeIcon from "@lucide/svelte/icons/calendar-range";
-	import ClockIcon from "@lucide/svelte/icons/clock";
-	import GithubIcon from "@lucide/svelte/icons/github";
-	import MoonIcon from "@lucide/svelte/icons/moon";
-	import SunIcon from "@lucide/svelte/icons/sun";
+	import * as Button from '$lib/components/ui/button';
+	import * as Input from '$lib/components/ui/input';
+	import * as Popover from '$lib/components/ui/popover';
+	import { Badge } from '$lib/components/ui/badge';
+	import { mode, toggleMode } from 'mode-watcher';
+	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
+	import CalendarRangeIcon from '@lucide/svelte/icons/calendar-range';
+	import ClockIcon from '@lucide/svelte/icons/clock';
+	import GithubIcon from '@lucide/svelte/icons/github';
+	import MoonIcon from '@lucide/svelte/icons/moon';
+	import SunIcon from '@lucide/svelte/icons/sun';
 
 	let {
 		renderDateRange,
 		renderLastUpdated,
-		search = $bindable(""),
+		search = $bindable(''),
 		searchSuggestions = [],
-		onRefresh = () => {},
+		onRefresh = () => {}
 	} = $props<{
 		renderDateRange: () => string;
 		renderLastUpdated: () => string;
@@ -30,7 +30,7 @@
 	let searchContentEl = $state<HTMLDivElement | null>(null);
 	let searchDropdownWidth = $state(0);
 	let ignoreSearchBlur = $state(false);
-	const isDarkMode = $derived.by(() => (mode.current ? mode.current === "dark" : true));
+	const isDarkMode = $derived.by(() => (mode.current ? mode.current === 'dark' : true));
 
 	const handleSuggestionSelect = (value: string) => {
 		search = value;
@@ -59,24 +59,24 @@
 	};
 
 	const handleSearchTab = (event: KeyboardEvent) => {
-		if (event.key !== "Tab" || event.shiftKey) return;
+		if (event.key !== 'Tab' || event.shiftKey) return;
 		if (searchSuggestions.length === 0) return;
 		event.preventDefault();
 		if (!searchOpen) openSearch();
 		ignoreSearchBlur = true;
 		setTimeout(() => {
-			searchContentEl?.querySelector<HTMLButtonElement>("button")?.focus();
+			searchContentEl?.querySelector<HTMLButtonElement>('button')?.focus();
 		}, 0);
 	};
 
 	const handleSuggestionKeydown = (event: KeyboardEvent) => {
-		if (event.key === "Escape") {
+		if (event.key === 'Escape') {
 			searchOpen = false;
 			searchInputEl?.focus();
 			return;
 		}
 		if (event.ctrlKey || event.metaKey || event.altKey) return;
-		if (event.key === "Backspace") {
+		if (event.key === 'Backspace') {
 			event.preventDefault();
 			search = search.slice(0, -1);
 			searchInputEl?.focus();
@@ -91,7 +91,7 @@
 
 	$effect(() => {
 		updateSearchDropdownWidth();
-		if (!searchInputEl || !("ResizeObserver" in window)) return;
+		if (!searchInputEl || !('ResizeObserver' in window)) return;
 		const observer = new ResizeObserver(() => updateSearchDropdownWidth());
 		observer.observe(searchInputEl);
 		return () => observer.disconnect();
@@ -140,25 +140,35 @@
 					</Badge>
 				</div>
 			</div>
-			<div class="leaderboard-header-actions flex w-full items-center gap-2 lg:w-auto lg:justify-end">
-				<div class="min-w-0 flex-1" on:keydown|capture={handleSearchTab}>
+			<div
+				class="leaderboard-header-actions flex w-full items-center gap-2 lg:w-auto lg:justify-end"
+			>
+				<div
+					class="min-w-0 flex-1"
+					role="group"
+					aria-label="Clan search"
+					onkeydowncapture={handleSearchTab}
+				>
 					<Popover.Root bind:open={searchOpen}>
-						<Popover.Trigger asChild>
-							<Input.Root
-								id="search-clan-top"
-								autocomplete="off"
-								class="w-full md:w-56"
-								placeholder="Search by clan tag"
-								bind:value={search}
-								bind:ref={searchInputEl}
-								on:focus={() => {
-									updateSearchDropdownWidth();
-									openSearch();
-								}}
-								on:input={openSearch}
-								on:blur={handleSearchBlur}
-								on:keydown={handleSearchTab}
-							/>
+						<Popover.Trigger>
+							{#snippet child({ props })}
+								<Input.Root
+									{...props}
+									id="search-clan-top"
+									autocomplete="off"
+									class="w-full md:w-56"
+									placeholder="Search by clan tag"
+									bind:value={search}
+									bind:ref={searchInputEl}
+									onfocus={() => {
+										updateSearchDropdownWidth();
+										openSearch();
+									}}
+									oninput={openSearch}
+									onblur={handleSearchBlur}
+									onkeydown={handleSearchTab}
+								/>
+							{/snippet}
 						</Popover.Trigger>
 						<Popover.Content
 							align="end"
@@ -169,19 +179,22 @@
 							style={`width: ${searchDropdownWidth}px; min-width: ${searchDropdownWidth}px;`}
 							class="search-suggestions max-h-64 overflow-y-auto p-1"
 						>
-							<div on:keydown={handleSuggestionKeydown}>
+							<div
+								role="listbox"
+								aria-label="Search suggestions"
+								tabindex="-1"
+								onkeydown={handleSuggestionKeydown}
+							>
 								{#if searchSuggestions.length === 0}
-									<div class="px-2 py-1.5 text-sm text-muted-foreground">
-										No clans found.
-									</div>
+									<div class="px-2 py-1.5 text-sm text-muted-foreground">No clans found.</div>
 								{:else}
-									{#each searchSuggestions as suggestion, idx}
+									{#each searchSuggestions as suggestion, idx (suggestion + idx)}
 										<button
 											type="button"
-											class="hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-left outline-none"
-											on:click={() => handleSuggestionSelect(suggestion)}
-											on:keydown={(event) => {
-												if (event.key === "Tab" && event.shiftKey && idx === 0) {
+											class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground"
+											onclick={() => handleSuggestionSelect(suggestion)}
+											onkeydown={(event) => {
+												if (event.key === 'Tab' && event.shiftKey && idx === 0) {
 													event.preventDefault();
 													searchInputEl?.focus();
 												}

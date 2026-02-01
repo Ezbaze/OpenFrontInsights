@@ -1,12 +1,12 @@
-const API_BASE = "https://api.openfront.io/public";
+const API_BASE = 'https://api.openfront.io/public';
 
 type Fetch = typeof fetch;
 
 async function fetchJson<T>(fetcher: Fetch, url: string): Promise<T> {
 	const response = await fetcher(url, {
 		headers: {
-			Accept: "application/json",
-		},
+			Accept: 'application/json'
+		}
 	});
 
 	if (!response.ok) {
@@ -23,22 +23,19 @@ export function fetchClanLeaderboard(fetcher: Fetch) {
 export function fetchClanStats(
 	fetcher: Fetch,
 	clanTag: string,
-	query: URLSearchParams | undefined,
+	query: URLSearchParams | undefined
 ) {
 	const queryString = query?.toString();
-	const suffix = queryString ? `?${queryString}` : "";
+	const suffix = queryString ? `?${queryString}` : '';
 	return fetchJson(fetcher, `${API_BASE}/clan/${encodeURIComponent(clanTag)}${suffix}`);
 }
 
 export function fetchClanSessions(
 	fetcher: Fetch,
 	clanTag: string,
-	query: URLSearchParams | undefined,
+	query: URLSearchParams | undefined
 ) {
 	const queryString = query?.toString();
-	const suffix = queryString ? `?${queryString}` : "";
-	return fetchJson(
-		fetcher,
-		`${API_BASE}/clan/${encodeURIComponent(clanTag)}/sessions${suffix}`,
-	);
+	const suffix = queryString ? `?${queryString}` : '';
+	return fetchJson(fetcher, `${API_BASE}/clan/${encodeURIComponent(clanTag)}/sessions${suffix}`);
 }

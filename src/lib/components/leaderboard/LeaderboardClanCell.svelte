@@ -1,7 +1,11 @@
 <script lang="ts">
-	import { Badge } from "$lib/components/ui/badge";
+	import { Badge } from '$lib/components/ui/badge';
 
-	let { tag, isTop = false, rankAccent = null } = $props<{
+	let {
+		tag,
+		isTop = false,
+		rankAccent = null
+	} = $props<{
 		tag: string;
 		isTop?: boolean;
 		rankAccent?: string | null;
@@ -10,8 +14,8 @@
 
 <Badge
 	variant="outline"
-	class={isTop ? "rank-tag" : ""}
-	style={isTop && rankAccent ? `--rank-accent: ${rankAccent}` : ""}
+	class={isTop ? 'rank-tag' : ''}
+	style={isTop && rankAccent ? `--rank-accent: ${rankAccent}` : ''}
 >
 	{tag}
 </Badge>

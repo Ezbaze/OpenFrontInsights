@@ -5,28 +5,28 @@
 		type SortingState,
 		getCoreRowModel,
 		getFilteredRowModel,
-		getSortedRowModel,
-	} from "@tanstack/table-core";
-	import * as Card from "$lib/components/ui/card";
-	import * as Table from "$lib/components/ui/table";
-	import * as Skeleton from "$lib/components/ui/skeleton";
-	import * as Empty from "$lib/components/ui/empty";
-	import * as Alert from "$lib/components/ui/alert";
-	import { createSvelteTable, FlexRender, renderComponent } from "$lib/components/ui/data-table";
-	import type { ClanLeaderboardEntry } from "$lib/types/openfront";
-	import DataTableSortHeader from "./DataTableSortHeader.svelte";
-	import LeaderboardRankCell from "./LeaderboardRankCell.svelte";
-	import LeaderboardClanCell from "./LeaderboardClanCell.svelte";
+		getSortedRowModel
+	} from '@tanstack/table-core';
+	import * as Card from '$lib/components/ui/card';
+	import * as Table from '$lib/components/ui/table';
+	import * as Skeleton from '$lib/components/ui/skeleton';
+	import * as Empty from '$lib/components/ui/empty';
+	import * as Alert from '$lib/components/ui/alert';
+	import { createSvelteTable, FlexRender, renderComponent } from '$lib/components/ui/data-table';
+	import type { ClanLeaderboardEntry } from '$lib/types/openfront';
+	import DataTableSortHeader from './DataTableSortHeader.svelte';
+	import LeaderboardRankCell from './LeaderboardRankCell.svelte';
+	import LeaderboardClanCell from './LeaderboardClanCell.svelte';
 
 	type ColumnMeta = {
-		align?: "center" | "right";
+		align?: 'center' | 'right';
 	};
 
 	let {
 		isLoading = false,
-		errorMessage = "",
+		errorMessage = '',
 		entries = [],
-		search = "",
+		search = '',
 		rankLookup,
 		rankImages = [],
 		rankAccentColors = [],
@@ -34,7 +34,7 @@
 		formatRatio,
 		formatPercent,
 		getWinRate,
-		openClanDialog,
+		openClanDialog
 	} = $props<{
 		isLoading?: boolean;
 		errorMessage?: string;
@@ -51,121 +51,116 @@
 	}>();
 
 	let sorting = $state<SortingState>([]);
-	let columnFilters = $state<ColumnFiltersState>([]);
+	const columnFilters = $derived.by<ColumnFiltersState>(() =>
+		search
+			? [
+					{
+						id: 'clanTag',
+						value: search
+					}
+				]
+			: []
+	);
 	const columns: ColumnDef<ClanLeaderboardEntry, unknown>[] = [
 		{
-			id: "rank",
-			header: "Rank",
+			id: 'rank',
+			header: 'Rank',
 			enableSorting: false,
-			meta: { align: "center" } satisfies ColumnMeta,
+			meta: { align: 'center' } satisfies ColumnMeta,
 			cell: ({ row }) => {
-				const originalRank =
-					rankLookup.get(String(row.original.clanTag ?? "")) ?? row.index + 1;
+				const originalRank = rankLookup.get(String(row.original.clanTag ?? '')) ?? row.index + 1;
 				return renderComponent(LeaderboardRankCell, {
 					rank: originalRank,
 					rankImage: originalRank <= 3 ? rankImages[originalRank - 1] : null,
-					rankAccent: originalRank <= 3 ? rankAccentColors[originalRank - 1] : null,
+					rankAccent: originalRank <= 3 ? rankAccentColors[originalRank - 1] : null
 				});
-			},
+			}
 		},
 		{
-			accessorKey: "clanTag",
+			accessorKey: 'clanTag',
 			header: ({ column }) =>
 				renderComponent(DataTableSortHeader, {
-					label: "Clan",
+					label: 'Clan',
 					onClick: column.getToggleSortingHandler(),
-					isSorted: column.getIsSorted(),
+					isSorted: column.getIsSorted()
 				}),
 			cell: ({ row }) => {
-				const originalRank =
-					rankLookup.get(String(row.original.clanTag ?? "")) ?? row.index + 1;
+				const originalRank = rankLookup.get(String(row.original.clanTag ?? '')) ?? row.index + 1;
 				return renderComponent(LeaderboardClanCell, {
-					tag: String(row.original.clanTag ?? "—"),
+					tag: String(row.original.clanTag ?? '—'),
 					isTop: originalRank <= 3,
-					rankAccent: originalRank <= 3 ? rankAccentColors[originalRank - 1] : null,
+					rankAccent: originalRank <= 3 ? rankAccentColors[originalRank - 1] : null
 				});
-			},
+			}
 		},
 		{
-			accessorKey: "weightedWins",
+			accessorKey: 'weightedWins',
 			header: ({ column }) =>
 				renderComponent(DataTableSortHeader, {
-					label: "Weighted Wins",
+					label: 'Weighted Wins',
 					onClick: column.getToggleSortingHandler(),
-					isSorted: column.getIsSorted(),
+					isSorted: column.getIsSorted()
 				}),
-			meta: { align: "right" } satisfies ColumnMeta,
-			cell: ({ row }) => formatNumber(row.original.weightedWins),
+			meta: { align: 'right' } satisfies ColumnMeta,
+			cell: ({ row }) => formatNumber(row.original.weightedWins)
 		},
 		{
-			accessorKey: "games",
+			accessorKey: 'games',
 			header: ({ column }) =>
 				renderComponent(DataTableSortHeader, {
-					label: "Games",
+					label: 'Games',
 					onClick: column.getToggleSortingHandler(),
-					isSorted: column.getIsSorted(),
+					isSorted: column.getIsSorted()
 				}),
-			meta: { align: "right" } satisfies ColumnMeta,
-			cell: ({ row }) => formatNumber(row.original.games),
+			meta: { align: 'right' } satisfies ColumnMeta,
+			cell: ({ row }) => formatNumber(row.original.games)
 		},
 		{
-			accessorKey: "wins",
+			accessorKey: 'wins',
 			header: ({ column }) =>
 				renderComponent(DataTableSortHeader, {
-					label: "Wins",
+					label: 'Wins',
 					onClick: column.getToggleSortingHandler(),
-					isSorted: column.getIsSorted(),
+					isSorted: column.getIsSorted()
 				}),
-			meta: { align: "right" } satisfies ColumnMeta,
-			cell: ({ row }) => formatNumber(row.original.wins),
+			meta: { align: 'right' } satisfies ColumnMeta,
+			cell: ({ row }) => formatNumber(row.original.wins)
 		},
 		{
-			accessorKey: "losses",
+			accessorKey: 'losses',
 			header: ({ column }) =>
 				renderComponent(DataTableSortHeader, {
-					label: "Losses",
+					label: 'Losses',
 					onClick: column.getToggleSortingHandler(),
-					isSorted: column.getIsSorted(),
+					isSorted: column.getIsSorted()
 				}),
-			meta: { align: "right" } satisfies ColumnMeta,
-			cell: ({ row }) => formatNumber(row.original.losses),
+			meta: { align: 'right' } satisfies ColumnMeta,
+			cell: ({ row }) => formatNumber(row.original.losses)
 		},
 		{
-			accessorKey: "weightedWLRatio",
+			accessorKey: 'weightedWLRatio',
 			header: ({ column }) =>
 				renderComponent(DataTableSortHeader, {
-					label: "W/L Ratio",
+					label: 'W/L Ratio',
 					onClick: column.getToggleSortingHandler(),
-					isSorted: column.getIsSorted(),
+					isSorted: column.getIsSorted()
 				}),
-			meta: { align: "right" } satisfies ColumnMeta,
-			cell: ({ row }) => formatRatio(row.original.weightedWLRatio),
+			meta: { align: 'right' } satisfies ColumnMeta,
+			cell: ({ row }) => formatRatio(row.original.weightedWLRatio)
 		},
 		{
-			id: "winRate",
+			id: 'winRate',
 			accessorFn: (entry) => getWinRate(entry),
 			header: ({ column }) =>
 				renderComponent(DataTableSortHeader, {
-					label: "Win Rate",
+					label: 'Win Rate',
 					onClick: column.getToggleSortingHandler(),
-					isSorted: column.getIsSorted(),
+					isSorted: column.getIsSorted()
 				}),
-			meta: { align: "right" } satisfies ColumnMeta,
-			cell: ({ row }) => formatPercent(getWinRate(row.original)),
-		},
+			meta: { align: 'right' } satisfies ColumnMeta,
+			cell: ({ row }) => formatPercent(getWinRate(row.original))
+		}
 	];
-
-	$effect(() => {
-		columnFilters = search
-			? [
-					{
-						id: "clanTag",
-						value: search,
-					},
-				]
-			: [];
-	});
-
 
 	const table = createSvelteTable({
 		get data() {
@@ -178,25 +173,18 @@
 			},
 			get columnFilters() {
 				return columnFilters;
-			},
+			}
 		},
 		onSortingChange: (updater) => {
-			if (typeof updater === "function") {
+			if (typeof updater === 'function') {
 				sorting = updater(sorting);
 			} else {
 				sorting = updater;
 			}
 		},
-		onColumnFiltersChange: (updater) => {
-			if (typeof updater === "function") {
-				columnFilters = updater(columnFilters);
-			} else {
-				columnFilters = updater;
-			}
-		},
 		getCoreRowModel: getCoreRowModel(),
 		getFilteredRowModel: getFilteredRowModel(),
-		getSortedRowModel: getSortedRowModel(),
+		getSortedRowModel: getSortedRowModel()
 	});
 </script>
 
@@ -213,14 +201,16 @@
 			</Alert.Root>
 		{:else if isLoading}
 			<div class="grid gap-3">
-				{#each Array(6) as _, idx (idx)}
+				{#each Array.from({ length: 6 }, (_, idx) => idx) as idx (idx)}
 					<Skeleton.Root class="h-12 w-full" />
 				{/each}
 			</div>
 		{:else if table.getRowModel().rows.length === 0}
 			<Empty.Root class="border-muted-foreground/30">
 				<h3 class="text-lg font-semibold">No clans found</h3>
-				<p class="text-sm text-muted-foreground">Try a different search or refresh the leaderboard.</p>
+				<p class="text-sm text-muted-foreground">
+					Try a different search or refresh the leaderboard.
+				</p>
 			</Empty.Root>
 		{:else}
 			<Table.Root>
@@ -233,12 +223,12 @@
 								<Table.Head
 									colspan={header.colSpan}
 									class={[
-										"border-l border-border/40 first:border-l-0",
-										header.column.id === "rank" ? "w-20 text-center" : "",
-										align === "right" ? "text-right" : "",
+										'border-l border-border/40 first:border-l-0',
+										header.column.id === 'rank' ? 'w-20 text-center' : '',
+										align === 'right' ? 'text-right' : ''
 									]
 										.filter(Boolean)
-										.join(" ")}
+										.join(' ')}
 								>
 									{#if !header.isPlaceholder}
 										<FlexRender
@@ -254,10 +244,12 @@
 				<Table.Body>
 					{#each table.getRowModel().rows as row (row.id)}
 						{@const originalRank =
-							rankLookup.get(String(row.original.clanTag ?? "")) ?? row.index + 1}
+							rankLookup.get(String(row.original.clanTag ?? '')) ?? row.index + 1}
 						<Table.Row
-							class={`cursor-pointer hover:bg-muted/60 ${originalRank <= 3 ? "rank-row" : ""}`}
-							style={originalRank <= 3 ? `--rank-accent: ${rankAccentColors[originalRank - 1]}` : ""}
+							class={`cursor-pointer hover:bg-muted/60 ${originalRank <= 3 ? 'rank-row' : ''}`}
+							style={originalRank <= 3
+								? `--rank-accent: ${rankAccentColors[originalRank - 1]}`
+								: ''}
 							onclick={() => openClanDialog(row.original.clanTag)}
 						>
 							{#each row.getVisibleCells() as cell (cell.id)}
@@ -265,17 +257,14 @@
 								{@const align = meta?.align}
 								<Table.Cell
 									class={[
-										"border-l border-border/40 first:border-l-0",
-										align === "right" ? "text-right" : "",
-										align === "center" ? "text-center" : "",
+										'border-l border-border/40 first:border-l-0',
+										align === 'right' ? 'text-right' : '',
+										align === 'center' ? 'text-center' : ''
 									]
 										.filter(Boolean)
-										.join(" ")}
+										.join(' ')}
 								>
-									<FlexRender
-										content={cell.column.columnDef.cell}
-										context={cell.getContext()}
-									/>
+									<FlexRender content={cell.column.columnDef.cell} context={cell.getContext()} />
 								</Table.Cell>
 							{/each}
 						</Table.Row>
