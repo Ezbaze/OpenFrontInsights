@@ -106,13 +106,13 @@
 		>
 			<div class="space-y-1">
 				<div class="flex flex-wrap items-center gap-3">
-					<h1 class="text-3xl font-semibold tracking-tight">OpenStats</h1>
+					<h1 class="text-3xl font-semibold tracking-tight">OpenFrontInsights</h1>
 					<a
 						class="inline-flex items-center text-muted-foreground transition-colors hover:text-foreground"
 						href="https://github.com/Ezbaze/DataFront"
 						rel="noreferrer"
 						target="_blank"
-						aria-label="OpenStats on GitHub"
+						aria-label="OpenFrontInsights on GitHub"
 					>
 						<GithubIcon class="size-4" />
 					</a>

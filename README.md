@@ -1,4 +1,4 @@
-# OpenStats - A Leaderboard for OpenFront
+# OpenFrontInsights - A Leaderboard for OpenFront
 
 ![banner](assets/banner.png)
 
