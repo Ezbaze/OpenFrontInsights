@@ -400,11 +400,11 @@
 				</Empty.Root>
 			{:else}
 				<ScrollArea.Root
-					class="sessions-scroll h-[70vh] w-full rounded-lg border"
+					class="h-[70vh] w-full rounded-lg border [&_[data-slot='table-container']]:overflow-visible [&_[data-slot='scroll-area-viewport']]:[scrollbar-gutter:stable_both-edges]"
 					orientation="both"
 					bind:viewportRef={sessionsViewport}
 				>
-					<Table.Root class="sessions-table">
+					<Table.Root class="min-w-full table-fixed">
 						<Table.Header bind:ref={sessionsHeaderEl} class="bg-background">
 							{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
 								<Table.Row>

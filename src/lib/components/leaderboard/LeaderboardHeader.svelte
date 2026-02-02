@@ -111,9 +111,21 @@
 	});
 </script>
 
-<header class="leaderboard-header">
-	<div class="leaderboard-header-accent" aria-hidden="true"></div>
-	<div class="leaderboard-header-content">
+<header
+	class="relative flex flex-col gap-3 overflow-hidden bg-background aspect-[1536/436] min-h-56 max-sm:aspect-auto max-sm:min-h-0"
+>
+	<div
+		class="pointer-events-none absolute inset-0 z-10 bg-[url('/images/ambient_header.png')] bg-cover bg-no-repeat [background-position:right_40%] [mask-image:linear-gradient(to_bottom,_rgba(0,0,0,1)_0%,_rgba(0,0,0,1)_72%,_rgba(0,0,0,0)_100%)] max-lg:[background-position:right_45%] max-sm:top-auto max-sm:bottom-0 max-sm:h-[6.5rem] max-sm:opacity-50 max-sm:[background-position:right_bottom] max-sm:[mask-image:linear-gradient(to_top,_rgba(0,0,0,1)_0%,_rgba(0,0,0,1)_55%,_rgba(0,0,0,0)_100%)] max-[420px]:hidden"
+		aria-hidden="true"
+	>
+		<div
+			class="pointer-events-none absolute inset-0 bg-[url('/images/ambient_header.png')] bg-cover bg-no-repeat [background-position:right_40%] blur-[18px] opacity-55 [mask-image:linear-gradient(to_bottom,_rgba(0,0,0,0)_0%,_rgba(0,0,0,0)_65%,_rgba(0,0,0,1)_100%)] max-lg:[background-position:right_45%] max-sm:top-auto max-sm:bottom-0 max-sm:h-[7.5rem] max-sm:opacity-35 max-sm:[background-position:right_bottom] max-sm:[mask-image:linear-gradient(to_top,_rgba(0,0,0,0)_0%,_rgba(0,0,0,1)_70%)]"
+			aria-hidden="true"
+		></div>
+	</div>
+	<div
+		class="absolute inset-0 z-20 flex flex-col gap-3 py-3 max-sm:relative max-sm:pt-[0.85rem] max-sm:pb-4"
+	>
 		<div
 			class="flex w-full flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start"
 		>
@@ -188,7 +200,7 @@
 							onCloseAutoFocus={(event) => event.preventDefault()}
 							bind:ref={searchContentEl}
 							style={`width: ${searchDropdownWidth}px; min-width: ${searchDropdownWidth}px;`}
-							class="search-suggestions max-h-64 overflow-y-auto p-1"
+							class="max-h-64 overflow-y-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
 						>
 							<div
 								role="listbox"

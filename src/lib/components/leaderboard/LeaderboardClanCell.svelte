@@ -14,7 +14,7 @@
 
 <Badge
 	variant="outline"
-	class={isTop ? 'rank-tag' : ''}
+	class={isTop ? 'border-[rgb(var(--rank-accent)/0.45)] text-[rgb(var(--rank-accent)/1)]' : ''}
 	style={isTop && rankAccent ? `--rank-accent: ${rankAccent}` : ''}
 >
 	{tag}

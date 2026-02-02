@@ -12,10 +12,15 @@
 
 {#if rank <= 3 && rankImage}
 	<span
-		class="rank-number inline-flex items-center justify-center gap-2"
+		class="inline-flex items-center justify-center gap-2 text-[rgb(var(--rank-accent)/1)]"
 		style={rankAccent ? `--rank-accent: ${rankAccent}` : ''}
 	>
-		<img src={rankImage} alt={`Rank ${rank}`} class="rank-icon h-4 w-4" loading="lazy" />
+		<img
+			src={rankImage}
+			alt={`Rank ${rank}`}
+			class="h-4 w-4 object-cover opacity-100 origin-center scale-[1.35]"
+			loading="lazy"
+		/>
 		<span>{rank}</span>
 	</span>
 {:else}

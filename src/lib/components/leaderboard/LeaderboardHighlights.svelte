@@ -54,15 +54,18 @@
 	{:else}
 		{#each topEntries as clan, index (clan.clanTag)}
 			<Card.Root
-				class="rank-card relative overflow-visible"
+				class="relative overflow-visible border-[rgb(var(--rank-accent)/0.22)] shadow-[inset_0_3px_0_rgb(var(--rank-accent)/1),_0_1px_2px_rgba(15,23,42,0.08)]"
 				style={`--rank-accent: ${rankAccentColors[index] ?? '0 0 0'}`}
 			>
-				<div class="rank-card-glow" aria-hidden="true"></div>
+				<div
+					class="pointer-events-none absolute inset-0 rounded-[inherit] bg-[radial-gradient(140px_80px_at_12%_6%,_rgb(var(--rank-accent)/0.16),_transparent_65%)] opacity-90"
+					aria-hidden="true"
+				></div>
 				{#if rankImages[index]}
 					<img
 						src={rankImages[index]}
 						alt={`Rank ${index + 1} accent`}
-						class="rank-accent pointer-events-none absolute top-0 left-1/2 h-14 w-14 -translate-x-1/2 -translate-y-1/2"
+						class="pointer-events-none absolute left-1/2 top-0 h-14 w-14 -translate-x-1/2 -translate-y-1/2 object-cover opacity-100 origin-center scale-[1.25] saturate-[1.05] drop-shadow-[0_10px_16px_rgba(15,23,42,0.18)] dark:drop-shadow-[0_10px_16px_rgba(0,0,0,0.55)]"
 						loading="lazy"
 					/>
 				{/if}
@@ -71,14 +74,14 @@
 						<Badge
 							variant={index === 0 ? 'default' : 'secondary'}
 							style={`--rank-accent: ${rankAccentColors[index] ?? '0 0 0'}`}
-							class="rank-badge"
+							class="bg-[rgb(var(--rank-accent)/0.15)] text-[rgb(var(--rank-accent)/1)] border-[rgb(var(--rank-accent)/0.45)]"
 						>
 							#{index + 1}
 						</Badge>
 						<Badge
 							variant="outline"
 							style={`--rank-accent: ${rankAccentColors[index] ?? '0 0 0'}`}
-							class="rank-tag"
+							class="border-[rgb(var(--rank-accent)/0.45)] text-[rgb(var(--rank-accent)/1)]"
 						>
 							{clan.clanTag}
 						</Badge>

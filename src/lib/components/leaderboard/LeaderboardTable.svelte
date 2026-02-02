@@ -246,7 +246,7 @@
 						{@const originalRank =
 							rankLookup.get(String(row.original.clanTag ?? '')) ?? row.index + 1}
 						<Table.Row
-							class={`cursor-pointer hover:bg-muted/60 ${originalRank <= 3 ? 'rank-row' : ''}`}
+							class={`cursor-pointer hover:bg-muted/60 ${originalRank <= 3 ? 'bg-[linear-gradient(90deg,_rgb(var(--rank-accent)/0.12)_0%,_rgb(var(--rank-accent)/0.05)_18%,_transparent_55%)] shadow-[inset_3px_0_0_rgb(var(--rank-accent)/0.9)]' : ''}`}
 							style={originalRank <= 3
 								? `--rank-accent: ${rankAccentColors[originalRank - 1]}`
 								: ''}
