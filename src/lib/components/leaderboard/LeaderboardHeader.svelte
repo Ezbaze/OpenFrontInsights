@@ -30,6 +30,7 @@
 	let searchContentEl = $state<HTMLDivElement | null>(null);
 	let searchDropdownWidth = $state(0);
 	let ignoreSearchBlur = $state(false);
+	let focusFromPointer = $state(false);
 	const isDarkMode = $derived.by(() => (mode.current ? mode.current === 'dark' : true));
 
 	const handleSuggestionSelect = (value: string) => {
@@ -39,6 +40,18 @@
 
 	const openSearch = () => {
 		searchOpen = true;
+	};
+
+	const handleSearchPointerDown = () => {
+		focusFromPointer = true;
+	};
+
+	const handleSearchFocus = () => {
+		updateSearchDropdownWidth();
+		if (!focusFromPointer) {
+			openSearch();
+		}
+		focusFromPointer = false;
 	};
 
 	const handleSearchBlur = () => {
@@ -160,10 +173,8 @@
 									placeholder="Search by clan tag"
 									bind:value={search}
 									bind:ref={searchInputEl}
-									onfocus={() => {
-										updateSearchDropdownWidth();
-										openSearch();
-									}}
+									onpointerdown={handleSearchPointerDown}
+									onfocus={handleSearchFocus}
 									oninput={openSearch}
 									onblur={handleSearchBlur}
 									onkeydown={handleSearchTab}
