@@ -122,7 +122,7 @@
 					<h1 class="text-3xl font-semibold tracking-tight">OpenFrontInsights</h1>
 					<a
 						class="inline-flex items-center text-muted-foreground transition-colors hover:text-foreground"
-						href="https://github.com/Ezbaze/DataFront"
+						href="https://github.com/Ezbaze/OpenFrontInsights"
 						rel="noreferrer"
 						target="_blank"
 						aria-label="OpenFrontInsights on GitHub"
