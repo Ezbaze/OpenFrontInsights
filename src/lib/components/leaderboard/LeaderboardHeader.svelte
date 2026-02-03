@@ -175,27 +175,30 @@
 					onkeydowncapture={handleSearchTab}
 				>
 					<Popover.Root bind:open={searchOpen}>
-						<Popover.Trigger>
-							{#snippet child({ props })}
-								<Input.Root
-									{...props}
-									id="search-clan-top"
-									autocomplete="off"
-									class="w-full md:w-56"
-									placeholder="Search by clan tag"
-									bind:value={search}
-									bind:ref={searchInputEl}
-									onpointerdown={handleSearchPointerDown}
-									onfocus={handleSearchFocus}
-									oninput={openSearch}
-									onblur={handleSearchBlur}
-									onkeydown={handleSearchTab}
-								/>
-							{/snippet}
-						</Popover.Trigger>
+						<Input.Root
+							id="search-clan-top"
+							type="text"
+							autocomplete="off"
+							class="w-full md:w-56"
+							placeholder="Search by clan tag"
+							role="combobox"
+							aria-autocomplete="list"
+							aria-label="Clan search"
+							aria-controls="search-clan-suggestions"
+							aria-expanded={searchOpen}
+							aria-haspopup="listbox"
+							bind:value={search}
+							bind:ref={searchInputEl}
+							onpointerdown={handleSearchPointerDown}
+							onfocus={handleSearchFocus}
+							oninput={openSearch}
+							onblur={handleSearchBlur}
+							onkeydown={handleSearchTab}
+						/>
 						<Popover.Content
 							align="end"
 							trapFocus={false}
+							customAnchor={searchInputEl}
 							onOpenAutoFocus={(event) => event.preventDefault()}
 							onCloseAutoFocus={(event) => event.preventDefault()}
 							bind:ref={searchContentEl}
@@ -203,17 +206,27 @@
 							class="max-h-64 overflow-y-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
 						>
 							<div
+								id="search-clan-suggestions"
 								role="listbox"
 								aria-label="Search suggestions"
 								tabindex="-1"
 								onkeydown={handleSuggestionKeydown}
 							>
 								{#if searchSuggestions.length === 0}
-									<div class="px-2 py-1.5 text-sm text-muted-foreground">No clans found.</div>
+									<div
+										role="status"
+										aria-live="polite"
+										class="px-2 py-1.5 text-sm text-muted-foreground"
+									>
+										No clans found.
+									</div>
 								{:else}
 									{#each searchSuggestions as suggestion, idx (suggestion + idx)}
 										<button
 											type="button"
+											role="option"
+											id={`search-suggestion-${idx}`}
+											aria-selected="false"
 											class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground"
 											onclick={() => handleSuggestionSelect(suggestion)}
 											onkeydown={(event) => {
