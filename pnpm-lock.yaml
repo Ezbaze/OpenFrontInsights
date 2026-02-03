@@ -38,6 +38,9 @@ importers:
       '@tailwindcss/vite':
         specifier: ^4.1.18
         version: 4.1.18(vite@7.3.1(@types/node@22.19.7)(jiti@2.6.1)(lightningcss@1.30.2))
+      '@tanstack/svelte-virtual':
+        specifier: ^3.13.18
+        version: 3.13.18(svelte@5.49.1)
       '@tanstack/table-core':
         specifier: ^8.21.3
         version: 8.21.3
@@ -894,9 +897,17 @@ packages:
     peerDependencies:
       vite: ^5.2.0 || ^6 || ^7
 
+  '@tanstack/svelte-virtual@3.13.18':
+    resolution: {integrity: sha512-BHh8WkFK58eE9KzLctPQkCkvCj46LnM9tIGkpwo5Unx5YaBPf0uBJBqvSdc2jMwdT8gLXLHFHtCnSujlZP69BA==}
+    peerDependencies:
+      svelte: ^3.48.0 || ^4.0.0 || ^5.0.0
+
   '@tanstack/table-core@8.21.3':
     resolution: {integrity: sha512-ldZXEhOBb8Is7xLs01fR3YEc3DERiz5silj8tnGkFZytt1abEvl/GhUmCE0PMLaMPTa3Jk4HbKmRlHmu+gCftg==}
     engines: {node: '>=12'}
+
+  '@tanstack/virtual-core@3.13.18':
+    resolution: {integrity: sha512-Mx86Hqu1k39icq2Zusq+Ey2J6dDWTjDvEv43PJtRCoEYTLyfaPnxIQ6iy7YAOK0NV/qOEmZQ/uCufrppZxTgcg==}
 
   '@testing-library/svelte-core@1.0.0':
     resolution: {integrity: sha512-VkUePoLV6oOYwSUvX6ShA8KLnJqZiYMIbP2JW2t0GLWLkJxKGvuH5qrrZBV/X7cXFnLGuFQEC7RheYiZOW68KQ==}
@@ -2858,7 +2869,14 @@ snapshots:
       tailwindcss: 4.1.18
       vite: 7.3.1(@types/node@22.19.7)(jiti@2.6.1)(lightningcss@1.30.2)
 
+  '@tanstack/svelte-virtual@3.13.18(svelte@5.49.1)':
+    dependencies:
+      '@tanstack/virtual-core': 3.13.18
+      svelte: 5.49.1
+
   '@tanstack/table-core@8.21.3': {}
+
+  '@tanstack/virtual-core@3.13.18': {}
 
   '@testing-library/svelte-core@1.0.0(svelte@5.49.1)':
     dependencies:

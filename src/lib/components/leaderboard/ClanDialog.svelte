@@ -402,6 +402,8 @@
 				<ScrollArea.Root
 					class="h-[70vh] w-full rounded-lg border [&_[data-slot='table-container']]:overflow-visible [&_[data-slot='scroll-area-viewport']]:[scrollbar-gutter:stable_both-edges]"
 					orientation="both"
+					scrollbarXClasses="z-20"
+					scrollbarYClasses="z-20"
 					bind:viewportRef={sessionsViewport}
 				>
 					<Table.Root class="min-w-full table-fixed">

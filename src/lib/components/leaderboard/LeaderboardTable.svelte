@@ -7,7 +7,9 @@
 		getFilteredRowModel,
 		getSortedRowModel
 	} from '@tanstack/table-core';
+	import { createVirtualizer } from '@tanstack/svelte-virtual';
 	import * as Card from '$lib/components/ui/card';
+	import * as ScrollArea from '$lib/components/ui/scroll-area';
 	import * as Table from '$lib/components/ui/table';
 	import * as Skeleton from '$lib/components/ui/skeleton';
 	import * as Empty from '$lib/components/ui/empty';
@@ -186,6 +188,48 @@
 		getFilteredRowModel: getFilteredRowModel(),
 		getSortedRowModel: getSortedRowModel()
 	});
+
+	const tableRows = $derived.by(() => table.getRowModel().rows);
+
+	let tableViewport = $state<HTMLElement | null>(null);
+	let tableHeaderEl = $state<HTMLTableSectionElement | null>(null);
+	const headerHeight = $derived.by(() => tableHeaderEl?.clientHeight ?? 0);
+
+	const estimatedRowHeight = 44;
+	const rowVirtualizer = createVirtualizer<HTMLElement, HTMLTableRowElement>({
+		count: tableRows.length,
+		getScrollElement: () => tableViewport,
+		estimateSize: () => estimatedRowHeight,
+		overscan: 8,
+		paddingStart: headerHeight,
+		getItemKey: (index) => tableRows[index]?.id ?? index
+	});
+
+	const measureRow = (node: HTMLTableRowElement) => {
+		$rowVirtualizer.measureElement(node);
+	};
+
+	$effect(() => {
+		const rows = tableRows;
+		const viewport = tableViewport;
+		$rowVirtualizer.setOptions({
+			count: rows.length,
+			getScrollElement: () => viewport,
+			paddingStart: headerHeight,
+			getItemKey: (index) => rows[index]?.id ?? index
+		});
+	});
+
+	const virtualRows = $derived.by(() => $rowVirtualizer.getVirtualItems());
+	const virtualPaddingTop = $derived.by(() => {
+		if (virtualRows.length === 0) return 0;
+		return Math.max(0, virtualRows[0].start - headerHeight);
+	});
+	const virtualPaddingBottom = $derived.by(() => {
+		if (virtualRows.length === 0) return 0;
+		const totalSize = $rowVirtualizer.getTotalSize();
+		return Math.max(0, totalSize - virtualRows[virtualRows.length - 1].end);
+	});
 </script>
 
 <Card.Root class="gap-4">
@@ -205,7 +249,7 @@
 					<Skeleton.Root class="h-12 w-full" />
 				{/each}
 			</div>
-		{:else if table.getRowModel().rows.length === 0}
+		{:else if tableRows.length === 0}
 			<Empty.Root class="border-muted-foreground/30">
 				<h3 class="text-lg font-semibold">No clans found</h3>
 				<p class="text-sm text-muted-foreground">
@@ -213,70 +257,101 @@
 				</p>
 			</Empty.Root>
 		{:else}
-			<Table.Root>
-				<Table.Header>
-					{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
-						<Table.Row>
-							{#each headerGroup.headers as header (header.id)}
-								{@const meta = header.column.columnDef.meta as ColumnMeta | undefined}
-								{@const align = meta?.align}
-								<Table.Head
-									colspan={header.colSpan}
-									class={[
-										'border-l border-border/40 first:border-l-0',
-										header.column.id === 'rank' ? 'w-20 text-center' : '',
-										align === 'right' ? 'text-right' : ''
-									]
-										.filter(Boolean)
-										.join(' ')}
-								>
-									{#if !header.isPlaceholder}
-										<FlexRender
-											content={header.column.columnDef.header}
-											context={header.getContext()}
-										/>
-									{/if}
-								</Table.Head>
-							{/each}
-						</Table.Row>
-					{/each}
-				</Table.Header>
-				<Table.Body>
-					{#each table.getRowModel().rows as row (row.id)}
-						{@const originalRank =
-							rankLookup.get(String(row.original.clanTag ?? '')) ?? row.index + 1}
-						<Table.Row
-							class={`cursor-pointer hover:bg-muted/60 ${originalRank <= 3 ? 'bg-[linear-gradient(90deg,_rgb(var(--rank-accent)/0.12)_0%,_rgb(var(--rank-accent)/0.05)_18%,_transparent_55%)] shadow-[inset_3px_0_0_rgb(var(--rank-accent)/0.9)]' : ''}`}
-							style={originalRank <= 3
-								? `--rank-accent: ${rankAccentColors[originalRank - 1]}`
-								: ''}
-							onclick={() => openClanDialog(row.original.clanTag)}
-						>
-							{#each row.getVisibleCells() as cell (cell.id)}
-								{@const meta = cell.column.columnDef.meta as ColumnMeta | undefined}
-								{@const align = meta?.align}
+			<ScrollArea.Root
+				class="h-[70vh] w-full [&_[data-slot='table-container']]:overflow-visible [&_[data-slot='scroll-area-viewport']]:[scrollbar-gutter:stable_both-edges]"
+				orientation="both"
+				scrollbarXClasses="z-20"
+				scrollbarYClasses="z-20"
+				bind:viewportRef={tableViewport}
+			>
+				<Table.Root class="min-w-full table-fixed">
+					<Table.Header bind:ref={tableHeaderEl} class="bg-card">
+						{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
+							<Table.Row class="hover:[&,&>svelte-css-wrapper]:[&>th,td]:!bg-card">
+								{#each headerGroup.headers as header (header.id)}
+									{@const meta = header.column.columnDef.meta as ColumnMeta | undefined}
+									{@const align = meta?.align}
+									<Table.Head
+										colspan={header.colSpan}
+										class={[
+											'sticky top-0 z-10 border-l border-border/40 bg-card first:border-l-0',
+											header.column.id === 'rank' ? 'w-20 text-center' : '',
+											align === 'right' ? 'text-right' : ''
+										]
+											.filter(Boolean)
+											.join(' ')}
+									>
+										{#if !header.isPlaceholder}
+											<FlexRender
+												content={header.column.columnDef.header}
+												context={header.getContext()}
+											/>
+										{/if}
+									</Table.Head>
+								{/each}
+							</Table.Row>
+						{/each}
+					</Table.Header>
+					<Table.Body>
+						{#if virtualPaddingTop > 0}
+							<Table.Row>
 								<Table.Cell
-									class={[
-										'border-l border-border/40 first:border-l-0',
-										align === 'right' ? 'text-right' : '',
-										align === 'center' ? 'text-center' : ''
-									]
-										.filter(Boolean)
-										.join(' ')}
+									colspan={Math.max(1, table.getVisibleLeafColumns().length)}
+									class="p-0"
 								>
-									<FlexRender content={cell.column.columnDef.cell} context={cell.getContext()} />
+									<div style={`height: ${virtualPaddingTop}px`}></div>
 								</Table.Cell>
-							{/each}
-						</Table.Row>
-					{:else}
-						<Table.Row>
-							<Table.Cell colspan={columns.length} class="h-24 text-center">
-								No clans found.
-							</Table.Cell>
-						</Table.Row>
-					{/each}
-				</Table.Body>
-			</Table.Root>
+							</Table.Row>
+						{/if}
+						{#each virtualRows as virtualRow (tableRows[virtualRow.index]?.id ?? virtualRow.key)}
+							{@const row = tableRows[virtualRow.index]}
+							{#if row}
+								{@const originalRank =
+									rankLookup.get(String(row.original.clanTag ?? '')) ?? row.index + 1}
+								<tr
+									data-slot="table-row"
+									data-index={virtualRow.index}
+									use:measureRow
+									class={`border-b transition-colors data-[state=selected]:bg-muted hover:[&,&>svelte-css-wrapper]:[&>th,td]:bg-muted/50 cursor-pointer hover:bg-muted/60 ${originalRank <= 3 ? 'bg-[linear-gradient(90deg,_rgb(var(--rank-accent)/0.12)_0%,_rgb(var(--rank-accent)/0.05)_18%,_transparent_55%)] shadow-[inset_3px_0_0_rgb(var(--rank-accent)/0.9)]' : ''}`}
+									style={originalRank <= 3
+										? `--rank-accent: ${rankAccentColors[originalRank - 1]}`
+										: ''}
+									onclick={() => openClanDialog(row.original.clanTag)}
+								>
+									{#each row.getVisibleCells() as cell (cell.id)}
+										{@const meta = cell.column.columnDef.meta as ColumnMeta | undefined}
+										{@const align = meta?.align}
+										<Table.Cell
+											class={[
+												'border-l border-border/40 first:border-l-0',
+												align === 'right' ? 'text-right' : '',
+												align === 'center' ? 'text-center' : ''
+											]
+												.filter(Boolean)
+												.join(' ')}
+										>
+											<FlexRender
+												content={cell.column.columnDef.cell}
+												context={cell.getContext()}
+											/>
+										</Table.Cell>
+									{/each}
+								</tr>
+							{/if}
+						{/each}
+						{#if virtualPaddingBottom > 0}
+							<Table.Row>
+								<Table.Cell
+									colspan={Math.max(1, table.getVisibleLeafColumns().length)}
+									class="p-0"
+								>
+									<div style={`height: ${virtualPaddingBottom}px`}></div>
+								</Table.Cell>
+							</Table.Row>
+						{/if}
+					</Table.Body>
+				</Table.Root>
+			</ScrollArea.Root>
 		{/if}
 	</Card.Content>
 </Card.Root>
