@@ -10,6 +10,8 @@
 	import GithubIcon from '@lucide/svelte/icons/github';
 	import MoonIcon from '@lucide/svelte/icons/moon';
 	import SunIcon from '@lucide/svelte/icons/sun';
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 
 	let {
 		renderDateRange,
@@ -36,6 +38,18 @@
 	const handleSuggestionSelect = (value: string) => {
 		search = value;
 		searchOpen = false;
+		navigateToClan(value);
+	};
+
+	const normalizeClanTag = (value: string) => value.trim().replace(/^\[|\]$/g, '');
+
+	const navigateToClan = (value: string) => {
+		const cleaned = normalizeClanTag(value);
+		if (!cleaned) return;
+		const tag = cleaned.toUpperCase();
+		search = tag;
+		searchOpen = false;
+		void goto(resolve(`/clans/${encodeURIComponent(tag)}`));
 	};
 
 	const openSearch = () => {
@@ -82,6 +96,15 @@
 		}, 0);
 	};
 
+	const handleSearchKeydown = (event: KeyboardEvent) => {
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			navigateToClan(search);
+			return;
+		}
+		handleSearchTab(event);
+	};
+
 	const handleSuggestionKeydown = (event: KeyboardEvent) => {
 		if (event.key === 'Escape') {
 			searchOpen = false;
@@ -112,14 +135,14 @@
 </script>
 
 <header
-	class="relative flex flex-col gap-3 overflow-hidden bg-background aspect-[1536/436] min-h-56 max-sm:aspect-auto max-sm:min-h-0"
+	class="relative flex aspect-[1536/436] min-h-56 flex-col gap-3 overflow-hidden bg-background max-sm:aspect-auto max-sm:min-h-0"
 >
 	<div
-		class="pointer-events-none absolute inset-0 z-10 bg-[url('/images/ambient_header.png')] bg-cover bg-no-repeat [background-position:right_40%] [mask-image:linear-gradient(to_bottom,_rgba(0,0,0,1)_0%,_rgba(0,0,0,1)_72%,_rgba(0,0,0,0)_100%)] max-lg:[background-position:right_45%] max-sm:top-auto max-sm:bottom-0 max-sm:h-[6.5rem] max-sm:opacity-50 max-sm:[background-position:right_bottom] max-sm:[mask-image:linear-gradient(to_top,_rgba(0,0,0,1)_0%,_rgba(0,0,0,1)_55%,_rgba(0,0,0,0)_100%)] max-[420px]:hidden"
+		class="pointer-events-none absolute inset-0 z-10 bg-[url('/images/ambient_header.png')] [mask-image:linear-gradient(to_bottom,_rgba(0,0,0,1)_0%,_rgba(0,0,0,1)_72%,_rgba(0,0,0,0)_100%)] bg-cover [background-position:right_40%] bg-no-repeat max-[420px]:hidden max-lg:[background-position:right_45%] max-sm:top-auto max-sm:bottom-0 max-sm:h-[6.5rem] max-sm:[mask-image:linear-gradient(to_top,_rgba(0,0,0,1)_0%,_rgba(0,0,0,1)_55%,_rgba(0,0,0,0)_100%)] max-sm:[background-position:right_bottom] max-sm:opacity-50"
 		aria-hidden="true"
 	>
 		<div
-			class="pointer-events-none absolute inset-0 bg-[url('/images/ambient_header.png')] bg-cover bg-no-repeat [background-position:right_40%] blur-[18px] opacity-55 [mask-image:linear-gradient(to_bottom,_rgba(0,0,0,0)_0%,_rgba(0,0,0,0)_65%,_rgba(0,0,0,1)_100%)] max-lg:[background-position:right_45%] max-sm:top-auto max-sm:bottom-0 max-sm:h-[7.5rem] max-sm:opacity-35 max-sm:[background-position:right_bottom] max-sm:[mask-image:linear-gradient(to_top,_rgba(0,0,0,0)_0%,_rgba(0,0,0,1)_70%)]"
+			class="pointer-events-none absolute inset-0 bg-[url('/images/ambient_header.png')] [mask-image:linear-gradient(to_bottom,_rgba(0,0,0,0)_0%,_rgba(0,0,0,0)_65%,_rgba(0,0,0,1)_100%)] bg-cover [background-position:right_40%] bg-no-repeat opacity-55 blur-[18px] max-lg:[background-position:right_45%] max-sm:top-auto max-sm:bottom-0 max-sm:h-[7.5rem] max-sm:[mask-image:linear-gradient(to_top,_rgba(0,0,0,0)_0%,_rgba(0,0,0,1)_70%)] max-sm:[background-position:right_bottom] max-sm:opacity-35"
 			aria-hidden="true"
 		></div>
 	</div>
@@ -131,7 +154,15 @@
 		>
 			<div class="space-y-1">
 				<div class="flex flex-wrap items-center gap-3">
-					<h1 class="text-3xl font-semibold tracking-tight">OpenFrontInsights</h1>
+					<h1 class="text-3xl font-semibold tracking-tight">
+						<a
+							href={resolve('/')}
+							class="inline-flex items-center transition-colors hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+							aria-label="OpenFrontInsights home"
+						>
+							OpenFrontInsights
+						</a>
+					</h1>
 					<a
 						class="inline-flex items-center text-muted-foreground transition-colors hover:text-foreground"
 						href="https://github.com/Ezbaze/OpenFrontInsights"
@@ -171,7 +202,7 @@
 				<div
 					class="min-w-0 flex-1"
 					role="group"
-					aria-label="Clan search"
+					aria-label="Clan navigation"
 					onkeydowncapture={handleSearchTab}
 				>
 					<Popover.Root bind:open={searchOpen}>
@@ -180,10 +211,10 @@
 							type="text"
 							autocomplete="off"
 							class="w-full md:w-56"
-							placeholder="Search by clan tag"
+							placeholder="Jump to clan tag"
 							role="combobox"
 							aria-autocomplete="list"
-							aria-label="Clan search"
+							aria-label="Jump to clan tag"
 							aria-controls="search-clan-suggestions"
 							aria-expanded={searchOpen}
 							aria-haspopup="listbox"
@@ -193,7 +224,7 @@
 							onfocus={handleSearchFocus}
 							oninput={openSearch}
 							onblur={handleSearchBlur}
-							onkeydown={handleSearchTab}
+							onkeydown={handleSearchKeydown}
 						/>
 						<Popover.Content
 							align="end"

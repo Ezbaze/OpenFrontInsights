@@ -1,52 +1,41 @@
 <script lang="ts">
 	import {
 		type ColumnDef,
-		type Row,
 		type SortingState,
 		type VisibilityState,
 		getCoreRowModel,
 		getSortedRowModel
 	} from '@tanstack/table-core';
-	import * as Dialog from '$lib/components/ui/dialog';
+	import { createVirtualizer } from '@tanstack/svelte-virtual';
 	import * as Table from '$lib/components/ui/table';
 	import * as Skeleton from '$lib/components/ui/skeleton';
 	import * as Empty from '$lib/components/ui/empty';
 	import * as Alert from '$lib/components/ui/alert';
 	import * as ScrollArea from '$lib/components/ui/scroll-area';
+	import { get } from 'svelte/store';
 	import {
 		createSvelteTable,
 		FlexRender,
 		renderComponent,
 		renderSnippet
 	} from '$lib/components/ui/data-table';
-	import { resolve } from '$app/paths';
 	import DataTableSortHeader from './DataTableSortHeader.svelte';
-	import ClanCharts from './ClanCharts.svelte';
-	import type { ClanStats } from '$lib/types/openfront';
 
 	type ClanSession = Record<string, unknown>;
 	type ColumnMeta = { align?: 'right' };
 
 	let {
-		dialogOpen = $bindable(false),
-		clanTag = null,
-		clanLoading = false,
-		clanStats = null,
-		clanError = '',
-		sessionsError = '',
-		sessionsLoading = false,
 		clanSessions = [],
-		getSessionKey
+		sessionsLoading = false,
+		sessionsError = '',
+		heightClass = 'h-[60vh]',
+		focusSessionKey = null
 	} = $props<{
-		dialogOpen?: boolean;
-		clanTag?: string | null;
-		clanLoading?: boolean;
-		clanStats?: ClanStats | null;
-		clanError?: string;
-		sessionsError?: string;
-		sessionsLoading?: boolean;
 		clanSessions?: ClanSession[];
-		getSessionKey: (session: ClanSession) => string;
+		sessionsLoading?: boolean;
+		sessionsError?: string;
+		heightClass?: string;
+		focusSessionKey?: string | null;
 	}>();
 
 	const formatMaybeNumber = (value: unknown) => {
@@ -72,7 +61,11 @@
 		game: (session: ClanSession) =>
 			session.gameId ?? session.game ?? session.id ?? session.sessionId ?? session.matchId,
 		start: (session: ClanSession) =>
-			session.start ?? session.startedAt ?? session.startTime ?? session.createdAt,
+			session.gameStart ??
+			session.start ??
+			session.startedAt ??
+			session.startTime ??
+			session.createdAt,
 		end: (session: ClanSession) => session.end ?? session.endedAt ?? session.endTime,
 		result: (session: ClanSession) => getSessionResult(session),
 		teams: (session: ClanSession) => session.numTeams ?? session.teams,
@@ -80,6 +73,13 @@
 		players: (session: ClanSession) =>
 			session.totalPlayerCount ?? session.playerCount ?? session.players
 	} as const;
+
+	const getSessionKey = (session: ClanSession) => {
+		const candidate =
+			rawValues.game(session) ?? session.sessionId ?? session.matchId ?? rawValues.start(session);
+		if (candidate !== undefined && candidate !== null) return String(candidate);
+		return JSON.stringify(session);
+	};
 
 	const getGameUrl = (session: ClanSession) => {
 		const value = rawValues.game(session);
@@ -144,14 +144,6 @@
 			compareNullable(rowA.getValue(columnId), rowB.getValue(columnId));
 
 	let sorting = $state<SortingState>([{ id: 'start', desc: true }]);
-	let wasOpen = $state(false);
-
-	$effect(() => {
-		if (dialogOpen && !wasOpen) {
-			sorting = [{ id: 'start', desc: true }];
-		}
-		wasOpen = dialogOpen;
-	});
 
 	const columnVisibility = $derived.by<VisibilityState>(() => ({
 		game: clanSessions.some((session: ClanSession) => {
@@ -307,57 +299,65 @@
 		getSortedRowModel: getSortedRowModel()
 	});
 
+	const tableRows = $derived.by(() => table.getRowModel().rows);
+
 	let sessionsViewport = $state<HTMLElement | null>(null);
 	let sessionsHeaderEl = $state<HTMLTableSectionElement | null>(null);
-	let sessionsScrollTop = $state(0);
-	let sessionsViewportHeight = $state(0);
-	const sessionRowHeight = 44;
-	const sessionOverscan = 6;
-
-	let sessionsVirtualPaddingTop = $state(0);
-	let sessionsVirtualPaddingBottom = $state(0);
-	let virtualRows = $state<Row<ClanSession>[]>([]);
-
 	const sessionsHeaderHeight = $derived.by(() => sessionsHeaderEl?.clientHeight ?? 0);
 
+	const estimatedRowHeight = 44;
+	const rowVirtualizer = createVirtualizer<HTMLElement, HTMLTableRowElement>({
+		count: tableRows.length,
+		getScrollElement: () => sessionsViewport,
+		estimateSize: () => estimatedRowHeight,
+		overscan: 6,
+		paddingStart: sessionsHeaderHeight,
+		getItemKey: (index) => tableRows[index]?.id ?? index
+	});
+
+	const measureRow = (node: HTMLTableRowElement) => {
+		$rowVirtualizer.measureElement(node);
+	};
+
 	$effect(() => {
-		void clanSessions;
-		void sorting;
-		const rows = table.getRowModel().rows;
-		const effectiveScrollTop = Math.max(0, sessionsScrollTop - sessionsHeaderHeight);
-		const visibleCount = Math.ceil(sessionsViewportHeight / sessionRowHeight) || 0;
-		const nextStart = Math.max(
-			0,
-			Math.floor(effectiveScrollTop / sessionRowHeight) - sessionOverscan
-		);
-		const nextEnd = Math.min(rows.length, nextStart + visibleCount + sessionOverscan * 2);
-		sessionsVirtualPaddingTop = nextStart * sessionRowHeight;
-		sessionsVirtualPaddingBottom = (rows.length - nextEnd) * sessionRowHeight;
-		virtualRows = rows.slice(nextStart, nextEnd);
+		const rows = tableRows;
+		const viewport = sessionsViewport;
+		$rowVirtualizer.setOptions({
+			count: rows.length,
+			getScrollElement: () => viewport,
+			paddingStart: sessionsHeaderHeight,
+			getItemKey: (index) => rows[index]?.id ?? index
+		});
+	});
+
+	const virtualRows = $derived.by(() => $rowVirtualizer.getVirtualItems());
+	const sessionsVirtualPaddingTop = $derived.by(() => {
+		if (virtualRows.length === 0) return 0;
+		return Math.max(0, virtualRows[0].start - sessionsHeaderHeight);
+	});
+	const sessionsVirtualPaddingBottom = $derived.by(() => {
+		if (virtualRows.length === 0) return 0;
+		const totalSize = $rowVirtualizer.getTotalSize();
+		return Math.max(0, totalSize - virtualRows[virtualRows.length - 1].end);
 	});
 
 	$effect(() => {
+		const target = focusSessionKey;
 		const viewport = sessionsViewport;
-		if (!viewport) return;
-		const handleScroll = () => {
-			sessionsScrollTop = viewport.scrollTop ?? 0;
-			sessionsViewportHeight = viewport.clientHeight ?? 0;
-		};
-		handleScroll();
-		viewport.addEventListener('scroll', handleScroll, { passive: true });
-		return () => {
-			viewport.removeEventListener('scroll', handleScroll);
-		};
+		if (!target || !viewport) return;
+		const rows = tableRows;
+		const targetIndex = rows.findIndex((row) => row.id === target);
+		if (targetIndex < 0) return;
+		get(rowVirtualizer).scrollToIndex(targetIndex, { align: 'center' });
 	});
 </script>
 
 {#snippet gameLink({ label, href }: { label: string; href: string | null })}
 	{#if href}
-		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 		<a
-			href={href ? (href.startsWith('http') ? href : resolve(href)) : undefined}
+			{href}
 			target="_blank"
-			rel="noopener noreferrer"
+			rel="noopener noreferrer external"
 			class="text-primary underline-offset-4 hover:underline"
 		>
 			{label}
@@ -367,136 +367,105 @@
 	{/if}
 {/snippet}
 
-<Dialog.Root bind:open={dialogOpen}>
-	<Dialog.Content
-		class="max-h-[90vh] !w-[92vw] !max-w-[1280px] overflow-y-auto p-0 sm:!max-w-[1280px]"
+{#if sessionsError}
+	<Alert.Root variant="destructive">
+		<Alert.Title>Games unavailable</Alert.Title>
+		<Alert.Description>{sessionsError}</Alert.Description>
+	</Alert.Root>
+{:else if sessionsLoading && clanSessions.length === 0}
+	<div class="grid gap-3">
+		{#each Array.from({ length: 5 }, (_, idx) => idx) as idx (idx)}
+			<Skeleton.Root class="h-10 w-full" />
+		{/each}
+	</div>
+{:else if clanSessions.length === 0}
+	<Empty.Root class="border-muted-foreground/30">
+		<h3 class="text-lg font-semibold">No games found</h3>
+		<p class="text-sm text-muted-foreground">
+			This clan has no recent public team games in the API range.
+		</p>
+	</Empty.Root>
+{:else}
+	<ScrollArea.Root
+		class={`${heightClass} w-full [&_[data-slot='scroll-area-viewport']]:[scrollbar-gutter:stable_both-edges] [&_[data-slot='table-container']]:overflow-visible`}
+		orientation="both"
+		scrollbarXClasses="z-20"
+		scrollbarYClasses="z-20"
+		bind:viewportRef={sessionsViewport}
 	>
-		<div class="flex flex-col gap-4 p-6">
-			<Dialog.Header class="sr-only">
-				<Dialog.Title>Recent games</Dialog.Title>
-			</Dialog.Header>
-
-			<div class="text-lg font-semibold">Clan overview</div>
-
-			{#if clanLoading}
-				<div class="grid gap-3">
-					<Skeleton.Root class="h-6 w-1/2" />
-					<Skeleton.Root class="h-40 w-full" />
-					<Skeleton.Root class="h-40 w-full" />
-				</div>
-			{:else if clanError}
-				<Alert.Root variant="destructive">
-					<Alert.Title>Clan details unavailable</Alert.Title>
-					<Alert.Description>{clanError}</Alert.Description>
-				</Alert.Root>
-			{:else}
-				<ClanCharts {clanTag} {clanStats} {clanSessions} {sessionsLoading} />
-			{/if}
-
-			<div class="text-lg font-semibold">Recent games</div>
-
-			{#if sessionsError}
-				<Alert.Root variant="destructive">
-					<Alert.Title>Games unavailable</Alert.Title>
-					<Alert.Description>{sessionsError}</Alert.Description>
-				</Alert.Root>
-			{:else if sessionsLoading && clanSessions.length === 0}
-				<div class="grid gap-3">
-					{#each Array.from({ length: 5 }, (_, idx) => idx) as idx (idx)}
-						<Skeleton.Root class="h-10 w-full" />
-					{/each}
-				</div>
-			{:else if clanSessions.length === 0}
-				<Empty.Root class="border-muted-foreground/30">
-					<h3 class="text-lg font-semibold">No games found</h3>
-					<p class="text-sm text-muted-foreground">
-						This clan has no recent public team games in the API range.
-					</p>
-				</Empty.Root>
-			{:else}
-				<ScrollArea.Root
-					class="h-[50vh] w-full rounded-lg border [&_[data-slot='scroll-area-viewport']]:[scrollbar-gutter:stable_both-edges] [&_[data-slot='table-container']]:overflow-visible"
-					orientation="both"
-					scrollbarXClasses="z-20"
-					scrollbarYClasses="z-20"
-					bind:viewportRef={sessionsViewport}
-				>
-					<Table.Root class="min-w-full table-fixed">
-						<Table.Header bind:ref={sessionsHeaderEl} class="bg-background">
-							{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
-								<Table.Row>
-									{#each headerGroup.headers as header (header.id)}
-										{@const meta = header.column.columnDef.meta as ColumnMeta | undefined}
-										{@const align = meta?.align}
-										<Table.Head
-											colspan={header.colSpan}
-											class={[
-												'sticky top-0 z-20 border-l border-border/40 bg-background first:border-l-0',
-												align === 'right' ? 'text-right' : ''
-											]
-												.filter(Boolean)
-												.join(' ')}
-										>
-											{#if !header.isPlaceholder}
-												<FlexRender
-													content={header.column.columnDef.header}
-													context={header.getContext()}
-												/>
-											{/if}
-										</Table.Head>
-									{/each}
-								</Table.Row>
+		<Table.Root class="min-w-full table-fixed">
+			<Table.Header bind:ref={sessionsHeaderEl} class="bg-card">
+				{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
+					<Table.Row class="hover:[&,&>svelte-css-wrapper]:[&>th,td]:!bg-card">
+						{#each headerGroup.headers as header (header.id)}
+							{@const meta = header.column.columnDef.meta as ColumnMeta | undefined}
+							{@const align = meta?.align}
+							<Table.Head
+								colspan={header.colSpan}
+								class={[
+									'sticky top-0 z-10 border-l border-border/40 bg-card first:border-l-0',
+									align === 'right' ? 'text-right' : ''
+								]
+									.filter(Boolean)
+									.join(' ')}
+							>
+								{#if !header.isPlaceholder}
+									<FlexRender
+										content={header.column.columnDef.header}
+										context={header.getContext()}
+									/>
+								{/if}
+							</Table.Head>
+						{/each}
+					</Table.Row>
+				{/each}
+			</Table.Header>
+			<Table.Body>
+				{#if sessionsVirtualPaddingTop > 0}
+					<Table.Row>
+						<Table.Cell colspan={Math.max(1, table.getVisibleLeafColumns().length)} class="p-0">
+							<div style={`height: ${sessionsVirtualPaddingTop}px`}></div>
+						</Table.Cell>
+					</Table.Row>
+				{/if}
+				{#each virtualRows as virtualRow (tableRows[virtualRow.index]?.id ?? virtualRow.key)}
+					{@const row = tableRows[virtualRow.index]}
+					{#if row}
+						{@const isFocused = row.id === focusSessionKey}
+						<tr
+							data-slot="table-row"
+							data-index={virtualRow.index}
+							use:measureRow
+							class={`border-b transition-colors hover:bg-muted/60 hover:[&,&>svelte-css-wrapper]:[&>th,td]:bg-muted/50 ${isFocused ? 'bg-muted/40 outline outline-1 outline-border/60' : ''}`}
+						>
+							{#each row.getVisibleCells() as cell (cell.id)}
+								{@const meta = cell.column.columnDef.meta as ColumnMeta | undefined}
+								{@const align = meta?.align}
+								<Table.Cell
+									class={[
+										'border-l border-border/40 first:border-l-0',
+										align === 'right' ? 'text-right' : ''
+									]
+										.filter(Boolean)
+										.join(' ')}
+								>
+									<FlexRender content={cell.column.columnDef.cell} context={cell.getContext()} />
+								</Table.Cell>
 							{/each}
-						</Table.Header>
-						<Table.Body>
-							{#if sessionsVirtualPaddingTop > 0}
-								<Table.Row>
-									<Table.Cell
-										colspan={Math.max(1, table.getVisibleLeafColumns().length)}
-										class="p-0"
-									>
-										<div style={`height: ${sessionsVirtualPaddingTop}px`}></div>
-									</Table.Cell>
-								</Table.Row>
-							{/if}
-							{#each virtualRows as row (row.id)}
-								<Table.Row>
-									{#each row.getVisibleCells() as cell (cell.id)}
-										{@const meta = cell.column.columnDef.meta as ColumnMeta | undefined}
-										{@const align = meta?.align}
-										<Table.Cell
-											class={[
-												'border-l border-border/40 first:border-l-0',
-												align === 'right' ? 'text-right' : ''
-											]
-												.filter(Boolean)
-												.join(' ')}
-										>
-											<FlexRender
-												content={cell.column.columnDef.cell}
-												context={cell.getContext()}
-											/>
-										</Table.Cell>
-									{/each}
-								</Table.Row>
-							{/each}
-							{#if sessionsVirtualPaddingBottom > 0}
-								<Table.Row>
-									<Table.Cell
-										colspan={Math.max(1, table.getVisibleLeafColumns().length)}
-										class="p-0"
-									>
-										<div style={`height: ${sessionsVirtualPaddingBottom}px`}></div>
-									</Table.Cell>
-								</Table.Row>
-							{/if}
-						</Table.Body>
-					</Table.Root>
-					{#if sessionsLoading}
-						<div class="px-3 py-2 text-sm text-muted-foreground">Loading games...</div>
+						</tr>
 					{/if}
-				</ScrollArea.Root>
-			{/if}
-		</div>
-	</Dialog.Content>
-</Dialog.Root>
+				{/each}
+				{#if sessionsVirtualPaddingBottom > 0}
+					<Table.Row>
+						<Table.Cell colspan={Math.max(1, table.getVisibleLeafColumns().length)} class="p-0">
+							<div style={`height: ${sessionsVirtualPaddingBottom}px`}></div>
+						</Table.Cell>
+					</Table.Row>
+				{/if}
+			</Table.Body>
+		</Table.Root>
+		{#if sessionsLoading}
+			<div class="px-3 py-2 text-sm text-muted-foreground">Loading games...</div>
+		{/if}
+	</ScrollArea.Root>
+{/if}

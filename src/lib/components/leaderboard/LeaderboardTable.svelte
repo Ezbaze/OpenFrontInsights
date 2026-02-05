@@ -9,11 +9,13 @@
 	} from '@tanstack/table-core';
 	import { createVirtualizer } from '@tanstack/svelte-virtual';
 	import * as Card from '$lib/components/ui/card';
+	import * as Input from '$lib/components/ui/input';
 	import * as ScrollArea from '$lib/components/ui/scroll-area';
 	import * as Table from '$lib/components/ui/table';
 	import * as Skeleton from '$lib/components/ui/skeleton';
 	import * as Empty from '$lib/components/ui/empty';
 	import * as Alert from '$lib/components/ui/alert';
+	import { get } from 'svelte/store';
 	import { createSvelteTable, FlexRender, renderComponent } from '$lib/components/ui/data-table';
 	import type { ClanLeaderboardEntry } from '$lib/types/openfront';
 	import DataTableSortHeader from './DataTableSortHeader.svelte';
@@ -28,7 +30,7 @@
 		isLoading = false,
 		errorMessage = '',
 		entries = [],
-		search = '',
+		focusClanTag = null,
 		rankLookup,
 		rankImages = [],
 		rankAccentColors = [],
@@ -41,7 +43,7 @@
 		isLoading?: boolean;
 		errorMessage?: string;
 		entries?: ClanLeaderboardEntry[];
-		search?: string;
+		focusClanTag?: string | null;
 		rankLookup: Map<string, number>;
 		rankImages?: string[];
 		rankAccentColors?: string[];
@@ -53,12 +55,14 @@
 	}>();
 
 	let sorting = $state<SortingState>([]);
+	let tableSearch = $state('');
+	const normalizedSearch = $derived.by(() => tableSearch.trim());
 	const columnFilters = $derived.by<ColumnFiltersState>(() =>
-		search
+		normalizedSearch
 			? [
 					{
 						id: 'clanTag',
-						value: search
+						value: normalizedSearch
 					}
 				]
 			: []
@@ -190,6 +194,9 @@
 	});
 
 	const tableRows = $derived.by(() => table.getRowModel().rows);
+	const focusClanTagNormalized = $derived.by(() =>
+		focusClanTag ? String(focusClanTag).toLowerCase() : null
+	);
 
 	let tableViewport = $state<HTMLElement | null>(null);
 	let tableHeaderEl = $state<HTMLTableSectionElement | null>(null);
@@ -220,6 +227,18 @@
 		});
 	});
 
+	$effect(() => {
+		const target = focusClanTagNormalized;
+		const viewport = tableViewport;
+		if (!target || !viewport) return;
+		const rows = tableRows;
+		const targetIndex = rows.findIndex(
+			(row) => String(row.original.clanTag ?? '').toLowerCase() === target
+		);
+		if (targetIndex < 0) return;
+		get(rowVirtualizer).scrollToIndex(targetIndex, { align: 'center' });
+	});
+
 	const virtualRows = $derived.by(() => $rowVirtualizer.getVirtualItems());
 	const virtualPaddingTop = $derived.by(() => {
 		if (virtualRows.length === 0) return 0;
@@ -233,9 +252,21 @@
 </script>
 
 <Card.Root class="gap-4">
-	<Card.Header>
-		<Card.Title class="text-xl">Leaderboard</Card.Title>
-		<Card.Description>Click a clan row to view stats and recent sessions.</Card.Description>
+	<Card.Header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+		<div class="space-y-1">
+			<Card.Title class="text-xl">Leaderboard</Card.Title>
+			<Card.Description>Click a clan row to view full clan details.</Card.Description>
+		</div>
+		<div class="w-full sm:w-64 sm:self-start">
+			<Input.Root
+				id="leaderboard-filter"
+				type="text"
+				autocomplete="off"
+				placeholder="Filter leaderboard"
+				aria-label="Filter leaderboard"
+				bind:value={tableSearch}
+			/>
+		</div>
 	</Card.Header>
 	<Card.Content>
 		{#if errorMessage}
@@ -258,7 +289,7 @@
 			</Empty.Root>
 		{:else}
 			<ScrollArea.Root
-				class="h-[70vh] w-full [&_[data-slot='table-container']]:overflow-visible [&_[data-slot='scroll-area-viewport']]:[scrollbar-gutter:stable_both-edges]"
+				class="h-[70vh] w-full [&_[data-slot='scroll-area-viewport']]:[scrollbar-gutter:stable_both-edges] [&_[data-slot='table-container']]:overflow-visible"
 				orientation="both"
 				scrollbarXClasses="z-20"
 				scrollbarYClasses="z-20"
@@ -295,10 +326,7 @@
 					<Table.Body>
 						{#if virtualPaddingTop > 0}
 							<Table.Row>
-								<Table.Cell
-									colspan={Math.max(1, table.getVisibleLeafColumns().length)}
-									class="p-0"
-								>
+								<Table.Cell colspan={Math.max(1, table.getVisibleLeafColumns().length)} class="p-0">
 									<div style={`height: ${virtualPaddingTop}px`}></div>
 								</Table.Cell>
 							</Table.Row>
@@ -308,11 +336,14 @@
 							{#if row}
 								{@const originalRank =
 									rankLookup.get(String(row.original.clanTag ?? '')) ?? row.index + 1}
+								{@const isFocused =
+									focusClanTagNormalized &&
+									String(row.original.clanTag ?? '').toLowerCase() === focusClanTagNormalized}
 								<tr
 									data-slot="table-row"
 									data-index={virtualRow.index}
 									use:measureRow
-									class={`border-b transition-colors data-[state=selected]:bg-muted hover:[&,&>svelte-css-wrapper]:[&>th,td]:bg-muted/50 cursor-pointer hover:bg-muted/60 ${originalRank <= 3 ? 'bg-[linear-gradient(90deg,_rgb(var(--rank-accent)/0.12)_0%,_rgb(var(--rank-accent)/0.05)_18%,_transparent_55%)] shadow-[inset_3px_0_0_rgb(var(--rank-accent)/0.9)]' : ''}`}
+									class={`cursor-pointer border-b transition-colors hover:bg-muted/60 data-[state=selected]:bg-muted hover:[&,&>svelte-css-wrapper]:[&>th,td]:bg-muted/50 ${isFocused ? 'bg-muted/40 outline outline-1 outline-border/60' : ''} ${originalRank <= 3 ? 'bg-[linear-gradient(90deg,_rgb(var(--rank-accent)/0.12)_0%,_rgb(var(--rank-accent)/0.05)_18%,_transparent_55%)] shadow-[inset_3px_0_0_rgb(var(--rank-accent)/0.9)]' : ''}`}
 									style={originalRank <= 3
 										? `--rank-accent: ${rankAccentColors[originalRank - 1]}`
 										: ''}
@@ -341,10 +372,7 @@
 						{/each}
 						{#if virtualPaddingBottom > 0}
 							<Table.Row>
-								<Table.Cell
-									colspan={Math.max(1, table.getVisibleLeafColumns().length)}
-									class="p-0"
-								>
+								<Table.Cell colspan={Math.max(1, table.getVisibleLeafColumns().length)} class="p-0">
 									<div style={`height: ${virtualPaddingBottom}px`}></div>
 								</Table.Cell>
 							</Table.Row>

@@ -18,7 +18,7 @@
 		<img
 			src={rankImage}
 			alt={`Rank ${rank}`}
-			class="h-4 w-4 object-cover opacity-100 origin-center scale-[1.35]"
+			class="h-4 w-4 origin-center scale-[1.35] object-cover opacity-100"
 			loading="lazy"
 		/>
 		<span>{rank}</span>

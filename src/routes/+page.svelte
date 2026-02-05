@@ -1,10 +1,13 @@
 <script lang="ts">
 	import LeaderboardHeader from '$lib/components/leaderboard/LeaderboardHeader.svelte';
 	import LeaderboardHighlights from '$lib/components/leaderboard/LeaderboardHighlights.svelte';
+	import LeaderboardCharts from '$lib/components/leaderboard/LeaderboardCharts.svelte';
 	import LeaderboardTable from '$lib/components/leaderboard/LeaderboardTable.svelte';
-	import ClanDialog from '$lib/components/leaderboard/ClanDialog.svelte';
 	import type { ClanLeaderboardEntry, ClanLeaderboardResponse } from '$lib/types/openfront';
 	import { SvelteSet } from 'svelte/reactivity';
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { tick } from 'svelte';
 
 	const numberFormatter = new Intl.NumberFormat('en-US');
 
@@ -16,15 +19,7 @@
 
 	let search = $state('');
 	const searchSuggestionLimit = 12;
-
-	let dialogOpen = $state(false);
-	let activeClanTag = $state<string | null>(null);
-	type ClanSession = Record<string, unknown>;
-	let clanSessions = $state<ClanSession[]>([]);
-	let clanLoading = $state(false);
-	let clanError = $state('');
-	let sessionsLoading = $state(false);
-	let sessionsError = $state('');
+	let focusedClanTag = $state<string | null>(null);
 
 	const formatNumber = (value: number | null | undefined) =>
 		value === null || value === undefined ? '—' : numberFormatter.format(value);
@@ -40,18 +35,6 @@
 		const total = entry.wins + entry.losses;
 		if (total <= 0) return 0;
 		return (entry.wins / total) * 100;
-	};
-
-	const getSessionKey = (session: ClanSession) => {
-		const candidate =
-			session.gameId ??
-			session.game ??
-			session.id ??
-			session.sessionId ??
-			session.matchId ??
-			session.start;
-		if (candidate !== undefined && candidate !== null) return String(candidate);
-		return JSON.stringify(session);
 	};
 
 	const refreshLeaderboard = async () => {
@@ -74,61 +57,17 @@
 		}
 	};
 
-	const resetSessionsState = () => {
-		clanSessions = [];
-		sessionsError = '';
+	const openClanDialog = (clanTag: string) => {
+		const tag = String(clanTag ?? '').trim();
+		if (!tag) return;
+		void goto(resolve(`/clans/${encodeURIComponent(tag.toUpperCase())}`));
 	};
-
-	const loadSessions = async () => {
-		if (sessionsLoading || !activeClanTag) return;
-		sessionsLoading = true;
-		sessionsError = '';
-
-		try {
-			const response = await fetch(`/api/clans/${activeClanTag}/sessions`);
-			if (!response.ok) {
-				throw new Error(`Sessions request failed ${response.status}`);
-			}
-			const json = (await response.json()) as unknown;
-			const nextSessions = Array.isArray(json)
-				? (json as ClanSession[])
-				: Array.isArray((json as { sessions?: unknown }).sessions)
-					? ((json as { sessions: ClanSession[] }).sessions ?? [])
-					: [];
-
-			const existingKeys = new SvelteSet(clanSessions.map(getSessionKey));
-			const deduped = nextSessions.filter((session) => !existingKeys.has(getSessionKey(session)));
-			clanSessions = deduped.length > 0 ? [...clanSessions, ...deduped] : clanSessions;
-		} catch (err) {
-			console.error('Failed to load clan sessions', err);
-			sessionsError = 'Unable to load recent games.';
-		} finally {
-			sessionsLoading = false;
-		}
-	};
-
-	const openClanDialog = async (clanTag: string) => {
-		activeClanTag = clanTag;
-		dialogOpen = true;
-		clanError = '';
-		clanLoading = true;
-		resetSessionsState();
-		void loadSessions();
-
-		try {
-			const statsRes = await fetch(`/api/clans/${clanTag}`);
-
-			if (!statsRes.ok) {
-				throw new Error(`Stats request failed ${statsRes.status}`);
-			}
-
-			await statsRes.json();
-		} catch (err) {
-			console.error('Failed to load clan detail', err);
-			clanError = 'Unable to load clan details.';
-		} finally {
-			clanLoading = false;
-		}
+	const handleClanFocus = async (clanTag: string) => {
+		const tag = String(clanTag ?? '').trim();
+		if (!tag) return;
+		focusedClanTag = null;
+		await tick();
+		focusedClanTag = tag;
 	};
 
 	const renderDateRange = () => {
@@ -206,7 +145,7 @@
 			{isLoading}
 			{errorMessage}
 			entries={tableData}
-			{search}
+			focusClanTag={focusedClanTag}
 			{rankLookup}
 			{rankImages}
 			{rankAccentColors}
@@ -216,15 +155,7 @@
 			{getWinRate}
 			{openClanDialog}
 		/>
+
+		<LeaderboardCharts entries={tableData} onClanFocus={handleClanFocus} />
 	</div>
 </div>
-
-<ClanDialog
-	bind:dialogOpen
-	{clanLoading}
-	{clanError}
-	{sessionsError}
-	{sessionsLoading}
-	{clanSessions}
-	{getSessionKey}
-/>

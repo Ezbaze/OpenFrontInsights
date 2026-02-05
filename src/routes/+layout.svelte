@@ -9,7 +9,7 @@
 		? typeof window !== 'undefined'
 			? window.location.origin
 			: 'http://localhost:5173'
-		: env.PUBLIC_SITE_URL ?? '';
+		: (env.PUBLIC_SITE_URL ?? '');
 </script>
 
 <svelte:head>

@@ -65,7 +65,7 @@
 					<img
 						src={rankImages[index]}
 						alt={`Rank ${index + 1} accent`}
-						class="pointer-events-none absolute left-1/2 top-0 h-14 w-14 -translate-x-1/2 -translate-y-1/2 object-cover opacity-100 origin-center scale-[1.25] saturate-[1.05] drop-shadow-[0_10px_16px_rgba(15,23,42,0.18)] dark:drop-shadow-[0_10px_16px_rgba(0,0,0,0.55)]"
+						class="pointer-events-none absolute top-0 left-1/2 h-14 w-14 origin-center -translate-x-1/2 -translate-y-1/2 scale-[1.25] object-cover opacity-100 drop-shadow-[0_10px_16px_rgba(15,23,42,0.18)] saturate-[1.05] dark:drop-shadow-[0_10px_16px_rgba(0,0,0,0.55)]"
 						loading="lazy"
 					/>
 				{/if}
@@ -74,7 +74,7 @@
 						<Badge
 							variant={index === 0 ? 'default' : 'secondary'}
 							style={`--rank-accent: ${rankAccentColors[index] ?? '0 0 0'}`}
-							class="bg-[rgb(var(--rank-accent)/0.15)] text-[rgb(var(--rank-accent)/1)] border-[rgb(var(--rank-accent)/0.45)]"
+							class="border-[rgb(var(--rank-accent)/0.45)] bg-[rgb(var(--rank-accent)/0.15)] text-[rgb(var(--rank-accent)/1)]"
 						>
 							#{index + 1}
 						</Badge>

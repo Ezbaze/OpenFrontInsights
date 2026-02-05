@@ -31,9 +31,7 @@
 	data-chart={chartId}
 	data-slot="chart"
 	class={cn(
-		'flex aspect-video justify-center overflow-visible text-xs',
-		// Overrides
-		//
+		'flex select-none aspect-video justify-center overflow-visible text-xs',
 		// Stroke around dots/marks when hovering
 		'[&_.lc-highlight-point]:stroke-transparent',
 		// override the default stroke color of lines
@@ -58,19 +56,16 @@
 		'[&_.lc-grid-x-radial-circle]:stroke-border [&_.lc-grid-x-radial-line]:stroke-border',
 		'[&_.lc-grid-y-radial-circle]:stroke-border [&_.lc-grid-y-radial-line]:stroke-border',
 
-		// Legend adjustments
 		'[&_.lc-legend-swatch-button]:items-center [&_.lc-legend-swatch-button]:gap-1.5',
 		'[&_.lc-legend-swatch-group]:items-center [&_.lc-legend-swatch-group]:gap-4',
 		'[&_.lc-legend-swatch]:size-2.5 [&_.lc-legend-swatch]:rounded-[2px]',
 
-		// Labels
 		'[&_.lc-labels-text:not([fill])]:fill-foreground [&_text]:stroke-transparent',
 
-		// Tick labels on th x/y axes
 		'[&_.lc-axis-tick-label]:fill-muted-foreground [&_.lc-axis-tick-label]:font-normal',
 		'[&_.lc-tooltip-rects-g]:fill-transparent',
 		'[&_.lc-layout-svg-g]:fill-transparent',
-		'[&_.lc-root-container]:w-full',
+		'[&_.lc-root-container]:w-full [&_.lc-root-container]:select-none [&_.lc-brush-context]:select-none',
 		className
 	)}
 	{...restProps}
