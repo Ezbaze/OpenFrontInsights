@@ -6,6 +6,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Empty from '$lib/components/ui/empty';
 	import { Badge } from '$lib/components/ui/badge';
+	import * as Progress from '$lib/components/ui/progress';
 	import { Toaster } from '$lib/components/ui/sonner';
 	import * as Table from '$lib/components/ui/table';
 	import { browser } from '$app/environment';
@@ -184,12 +185,18 @@
 	};
 
 	const hasSessionData = $derived.by(() => clanSessions.length > 0);
-	const showSessionLoadingCard = $derived.by(() => sessionsLoading && !hasSessionData);
+	const showSessionLoadingCard = $derived.by(() => sessionsLoading);
 	const showPartialSessionsWarning = $derived.by(() => Boolean(sessionsError) && hasSessionData);
 
 	const sessionsProgressLabel = $derived.by(() => {
 		if (!sessionsLoading) return '';
 		return `${sessionsLoadedChunks} chunk${sessionsLoadedChunks === 1 ? '' : 's'} fetched`;
+	});
+	const sessionsProgressValue = $derived.by(() => {
+		if (!sessionsLoading) return 100;
+		if (sessionsLoadedChunks <= 0) return 10;
+		const estimated = Math.min(95, 10 + sessionsLoadedChunks * 6);
+		return estimated;
 	});
 
 	const tableData = $derived.by(
@@ -429,6 +436,11 @@
 						</Card.Description>
 					</Card.Header>
 					<Card.Content class="grid gap-3">
+						<Progress.Root
+							value={sessionsProgressValue}
+							max={100}
+							aria-label="Loading session data"
+						/>
 						<div class="text-sm text-muted-foreground">{sessionsProgressLabel}</div>
 					</Card.Content>
 				</Card.Root>
