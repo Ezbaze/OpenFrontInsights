@@ -41,22 +41,6 @@ export const load: PageLoad = async ({ fetch, params }) => {
 		errors.stats = 'Unable to load clan stats.';
 	}
 
-	try {
-		const response = await fetch(`/api/clans/${encodeURIComponent(clanTag)}/sessions`);
-		if (!response.ok) {
-			throw new Error(`Clan sessions request failed ${response.status}`);
-		}
-		const json = (await response.json()) as unknown;
-		clanSessions = Array.isArray(json)
-			? (json as ClanSession[])
-			: Array.isArray((json as { sessions?: unknown }).sessions)
-				? ((json as { sessions: ClanSession[] }).sessions ?? [])
-				: [];
-	} catch (err) {
-		console.error(`Failed to load clan sessions for ${clanTag}`, err);
-		errors.sessions = 'Unable to load clan sessions.';
-	}
-
 	return {
 		clanTag,
 		leaderboard,

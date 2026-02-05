@@ -6,9 +6,12 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Empty from '$lib/components/ui/empty';
 	import { Badge } from '$lib/components/ui/badge';
+	import { Toaster } from '$lib/components/ui/sonner';
 	import * as Table from '$lib/components/ui/table';
+	import { browser } from '$app/environment';
 	import { invalidateAll } from '$app/navigation';
 	import { tick } from 'svelte';
+	import { toast } from 'svelte-sonner';
 	import type { ClanLeaderboardResponse, ClanSession, ClanStats } from '$lib/types/openfront';
 	import { SvelteSet } from 'svelte/reactivity';
 
@@ -27,9 +30,129 @@
 		};
 	}>();
 
+	let clanSessions = $state<ClanSession[]>(data.clanSessions ?? []);
+	let sessionsLoading = $state(true);
+	let sessionsComplete = $state(false);
+	let sessionsError = $state(data.errors.sessions ?? '');
+	let sessionsLoadedChunks = $state(0);
+	let sessionsNotifiedComplete = $state(false);
+
+	let activeSessionsLoadId = 0;
+	let activeSessionsAbort: AbortController | null = null;
+
+	const SESSION_CHUNK_DAYS = 7;
+	const SESSION_CHUNK_MS = SESSION_CHUNK_DAYS * 24 * 60 * 60 * 1000;
+	const SESSION_MAX_CHUNKS = 260;
+
 	const numberFormatter = new Intl.NumberFormat('en-US');
 	let search = $state('');
 	const searchSuggestionLimit = 12;
+
+	const extractSessions = (payload: unknown): ClanSession[] => {
+		if (Array.isArray(payload)) return payload as ClanSession[];
+		if (
+			payload &&
+			typeof payload === 'object' &&
+			Array.isArray((payload as { sessions?: unknown }).sessions)
+		) {
+			return ((payload as { sessions: ClanSession[] }).sessions ?? []) as ClanSession[];
+		}
+		return [];
+	};
+
+	const getSessionKey = (session: ClanSession) => {
+		const candidate =
+			session.gameId ??
+			session.game ??
+			session.id ??
+			session.sessionId ??
+			session.matchId ??
+			session.gameStart;
+		if (candidate !== undefined && candidate !== null && candidate !== '') return String(candidate);
+		return JSON.stringify(session);
+	};
+
+	const fetchSessionChunk = async (
+		clanTag: string,
+		start: Date,
+		end: Date,
+		signal: AbortSignal
+	) => {
+		const params = new URLSearchParams({
+			start: start.toISOString(),
+			end: end.toISOString()
+		});
+		const response = await fetch(
+			`/api/clans/${encodeURIComponent(clanTag)}/sessions?${params.toString()}`,
+			{ signal }
+		);
+		if (!response.ok) {
+			throw new Error(`Clan sessions request failed ${response.status}`);
+		}
+		const json = (await response.json()) as unknown;
+		return extractSessions(json);
+	};
+
+	const loadAllSessions = async (clanTag: string) => {
+		if (!clanTag) return;
+
+		activeSessionsLoadId += 1;
+		const loadId = activeSessionsLoadId;
+
+		activeSessionsAbort?.abort();
+		const controller = new AbortController();
+		activeSessionsAbort = controller;
+
+		sessionsLoading = true;
+		sessionsComplete = false;
+		sessionsError = '';
+		clanSessions = [];
+		sessionsLoadedChunks = 0;
+		sessionsNotifiedComplete = false;
+
+		const seen = new Set<string>();
+		const results: ClanSession[] = [];
+
+		try {
+			let cursorEnd = new Date();
+			let chunkCount = 0;
+			while (chunkCount < SESSION_MAX_CHUNKS) {
+				if (controller.signal.aborted || loadId !== activeSessionsLoadId) return;
+				const end = new Date(cursorEnd);
+				const start = new Date(end.getTime() - SESSION_CHUNK_MS);
+				const chunk = await fetchSessionChunk(clanTag, start, end, controller.signal);
+				chunkCount += 1;
+				sessionsLoadedChunks = chunkCount;
+				if (chunk.length === 0) break;
+				for (const session of chunk) {
+					const key = getSessionKey(session);
+					if (seen.has(key)) continue;
+					seen.add(key);
+					results.push(session);
+				}
+				clanSessions = [...results];
+				cursorEnd = start;
+			}
+			if (loadId !== activeSessionsLoadId) return;
+			if (chunkCount >= SESSION_MAX_CHUNKS) {
+				sessionsError =
+					'Reached lookback limit while loading sessions. Showing the most recent data found.';
+			}
+			sessionsComplete = true;
+		} catch (err) {
+			if (controller.signal.aborted || loadId !== activeSessionsLoadId) return;
+			console.error(`Failed to load clan sessions for ${clanTag}`, err);
+			sessionsError =
+				results.length > 0
+					? 'Unable to load older sessions. Showing partial session data.'
+					: 'Unable to load clan sessions.';
+			sessionsComplete = results.length > 0;
+		} finally {
+			if (loadId === activeSessionsLoadId) {
+				sessionsLoading = false;
+			}
+		}
+	};
 
 	const formatNumber = (value: number | null | undefined) =>
 		value === null || value === undefined ? '—' : numberFormatter.format(value);
@@ -60,6 +183,15 @@
 	const refreshPage = async () => {
 		await invalidateAll();
 	};
+
+	const hasSessionData = $derived.by(() => clanSessions.length > 0);
+	const showSessionLoadingCard = $derived.by(() => sessionsLoading && !hasSessionData);
+	const showPartialSessionsWarning = $derived.by(() => Boolean(sessionsError) && hasSessionData);
+
+	const sessionsProgressLabel = $derived.by(() => {
+		if (!sessionsLoading) return '';
+		return `${sessionsLoadedChunks} chunk${sessionsLoadedChunks === 1 ? '' : 's'} fetched`;
+	});
 
 	const tableData = $derived.by(() => (data.leaderboard ? data.leaderboard.clans : []));
 	const rankLookup = $derived.by(
@@ -150,9 +282,31 @@
 		await tick();
 		focusedSessionKey = sessionKey;
 	};
+
+	$effect(() => {
+		if (!browser) return;
+		const clanTag = data.clanTag;
+		const reloadToken = data.loadedAt;
+		void reloadToken;
+		void loadAllSessions(clanTag);
+	});
+
+	$effect(() => {
+		if (!browser) return;
+		if (
+			sessionsComplete &&
+			!sessionsLoading &&
+			!sessionsError &&
+			!sessionsNotifiedComplete
+		) {
+			toast.success('Clan sessions loaded.');
+			sessionsNotifiedComplete = true;
+		}
+	});
 </script>
 
 <div class="min-h-screen bg-background">
+	<Toaster position="top-right" />
 	<div class="mx-auto flex w-full max-w-6xl flex-col gap-4 p-8">
 		<LeaderboardHeader
 			bind:search
@@ -248,27 +402,54 @@
 		<ClanCharts
 			clanTag={data.clanTag.toUpperCase()}
 			clanStats={data.clanStats}
-			clanSessions={data.clanSessions}
-			sessionsLoading={false}
+			clanSessions={clanSessions}
+			sessionsLoading={sessionsLoading}
+			sessionsComplete={sessionsComplete}
+			sessionsError={hasSessionData ? '' : sessionsError}
+			hideSessions={showSessionLoadingCard}
 			onSessionFocus={handleSessionFocus}
 		/>
 
-		<section class="flex flex-col gap-4">
-			<Card.Root>
-				<Card.Header>
-					<Card.Title class="text-xl">Recent games</Card.Title>
-					<Card.Description>Latest public sessions for this clan.</Card.Description>
-				</Card.Header>
-				<Card.Content>
-					<ClanSessionsTable
-						clanSessions={data.clanSessions}
-						sessionsLoading={false}
-						sessionsError={data.errors.sessions ?? ''}
-						heightClass="h-[70vh]"
-						focusSessionKey={focusedSessionKey}
-					/>
-				</Card.Content>
-			</Card.Root>
-		</section>
+		{#if showPartialSessionsWarning}
+			<Alert.Root>
+				<Alert.Title>Showing partial session data</Alert.Title>
+				<Alert.Description>{sessionsError}</Alert.Description>
+			</Alert.Root>
+		{/if}
+
+		{#if showSessionLoadingCard}
+			<section class="flex flex-col gap-4">
+				<Card.Root>
+					<Card.Header>
+						<Card.Title class="text-xl">Loading session data</Card.Title>
+						<Card.Description>
+							Pulling recent clan sessions in weekly windows and stepping backward until no
+							more sessions are returned.
+						</Card.Description>
+					</Card.Header>
+					<Card.Content class="grid gap-3">
+						<div class="text-sm text-muted-foreground">{sessionsProgressLabel}</div>
+					</Card.Content>
+				</Card.Root>
+			</section>
+		{:else}
+			<section class="flex flex-col gap-4">
+				<Card.Root>
+					<Card.Header>
+						<Card.Title class="text-xl">Recent games</Card.Title>
+						<Card.Description>Latest public sessions for this clan.</Card.Description>
+					</Card.Header>
+					<Card.Content>
+						<ClanSessionsTable
+							clanSessions={clanSessions}
+							sessionsLoading={sessionsLoading}
+							sessionsError={hasSessionData ? '' : sessionsError}
+							heightClass="h-[70vh]"
+							focusSessionKey={focusedSessionKey}
+						/>
+					</Card.Content>
+				</Card.Root>
+			</section>
+		{/if}
 	</div>
 </div>

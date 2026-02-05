@@ -9,7 +9,16 @@ export const GET: RequestHandler = async ({ fetch, params, url }) => {
 	}
 
 	try {
-		const data = await fetchClanSessions(fetch, clanTag, url.searchParams);
+		const query = new URLSearchParams(url.searchParams);
+		const hasRange = query.has('start') && query.has('end');
+		if (!hasRange) {
+			const end = new Date();
+			const start = new Date(end);
+			start.setUTCDate(end.getUTCDate() - 30);
+			query.set('start', start.toISOString());
+			query.set('end', end.toISOString());
+		}
+		const data = await fetchClanSessions(fetch, clanTag, query);
 		return json(data, {
 			headers: {
 				'cache-control': 's-maxage=60, stale-while-revalidate=300'
