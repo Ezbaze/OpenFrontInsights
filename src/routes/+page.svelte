@@ -3,13 +3,17 @@
 	import LeaderboardHighlights from '$lib/components/leaderboard/LeaderboardHighlights.svelte';
 	import LeaderboardCharts from '$lib/components/leaderboard/LeaderboardCharts.svelte';
 	import LeaderboardTable from '$lib/components/leaderboard/LeaderboardTable.svelte';
-	import type { ClanLeaderboardEntry, ClanLeaderboardResponse } from '$lib/types/openfront';
+	import {
+		displayNumber,
+		displayPercent,
+		displayRatio,
+		getLeaderboardWinRatePercent
+	} from '$lib/leaderboard/metrics';
+	import type { ClanLeaderboardResponse } from '$lib/types/openfront';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { tick } from 'svelte';
-
-	const numberFormatter = new Intl.NumberFormat('en-US');
 
 	let { data } = $props<{ data: { leaderboard: ClanLeaderboardResponse | null } | null }>();
 	let leaderboard = $state<ClanLeaderboardResponse | null>(null);
@@ -21,21 +25,10 @@
 	const searchSuggestionLimit = 12;
 	let focusedClanTag = $state<string | null>(null);
 
-	const formatNumber = (value: number | null | undefined) =>
-		value === null || value === undefined ? '—' : numberFormatter.format(value);
-
-	const formatRatio = (value: number | null | undefined) => {
-		if (value === null || value === undefined || Number.isNaN(value)) return '—';
-		return value.toFixed(2);
-	};
-
-	const formatPercent = (value: number) => `${value.toFixed(1)}%`;
-
-	const getWinRate = (entry: ClanLeaderboardEntry) => {
-		const total = entry.wins + entry.losses;
-		if (total <= 0) return 0;
-		return (entry.wins / total) * 100;
-	};
+	const formatNumber = displayNumber;
+	const formatRatio = displayRatio;
+	const formatPercent = displayPercent;
+	const getWinRate = getLeaderboardWinRatePercent;
 
 	const refreshLeaderboard = async () => {
 		isLoading = true;
@@ -97,7 +90,9 @@
 	const rankImages = ['/images/rank-1.png', '/images/rank-2.png', '/images/rank-3.png'];
 	const rankAccentColors = ['211 158 34', '127 141 154', '167 95 32'];
 
-	const tableData = $derived.by(() => (leaderboard ? leaderboard.clans : []));
+	const tableData = $derived.by(
+		() => (leaderboard?.clans ?? []) as ClanLeaderboardResponse['clans']
+	);
 	const searchSuggestions = $derived.by(() => {
 		const target = String(search ?? '')
 			.trim()

@@ -31,7 +31,7 @@
 	data-chart={chartId}
 	data-slot="chart"
 	class={cn(
-		'flex select-none aspect-video justify-center overflow-visible text-xs',
+		'flex aspect-video justify-center overflow-visible text-xs select-none',
 		// Stroke around dots/marks when hovering
 		'[&_.lc-highlight-point]:stroke-transparent',
 		// override the default stroke color of lines
@@ -65,7 +65,7 @@
 		'[&_.lc-axis-tick-label]:fill-muted-foreground [&_.lc-axis-tick-label]:font-normal',
 		'[&_.lc-tooltip-rects-g]:fill-transparent',
 		'[&_.lc-layout-svg-g]:fill-transparent',
-		'[&_.lc-root-container]:w-full [&_.lc-root-container]:select-none [&_.lc-brush-context]:select-none',
+		'[&_.lc-brush-context]:select-none [&_.lc-root-container]:w-full [&_.lc-root-container]:select-none',
 		className
 	)}
 	{...restProps}

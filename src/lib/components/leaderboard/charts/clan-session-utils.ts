@@ -1,11 +1,19 @@
 import type { ClanSession } from '$lib/types/openfront';
 
+export const extractSessions = (payload: unknown): ClanSession[] => {
+	if (Array.isArray(payload)) return payload as ClanSession[];
+	if (
+		payload &&
+		typeof payload === 'object' &&
+		Array.isArray((payload as { sessions?: unknown }).sessions)
+	) {
+		return ((payload as { sessions: ClanSession[] }).sessions ?? []) as ClanSession[];
+	}
+	return [];
+};
+
 export const getSessionStart = (session: ClanSession) =>
-	session.gameStart ??
-	session.start ??
-	session.startedAt ??
-	session.startTime ??
-	session.createdAt;
+	session.gameStart ?? session.start ?? session.startedAt ?? session.startTime ?? session.createdAt;
 
 export const getSessionHasWon = (session: ClanSession) => {
 	if (typeof session.hasWon === 'boolean') return session.hasWon;
@@ -27,10 +35,7 @@ export const getSessionGameCode = (session: ClanSession) =>
 	session.gameId ?? session.game ?? session.id ?? session.sessionId ?? session.matchId;
 export const getSessionKey = (session: ClanSession) => {
 	const candidate =
-		getSessionGameCode(session) ??
-		session.sessionId ??
-		session.matchId ??
-		getSessionStart(session);
+		getSessionGameCode(session) ?? session.sessionId ?? session.matchId ?? getSessionStart(session);
 	if (candidate !== undefined && candidate !== null && candidate !== '') return String(candidate);
 	return JSON.stringify(session);
 };

@@ -28,7 +28,9 @@
 	let activeGamesTag = $state<string | null>(null);
 	let activeGamesValues = $state<number[] | null>(null);
 
-	const topEntries = $derived.by(() => entries.slice(0, topCount));
+	const topEntries = $derived.by<ClanLeaderboardEntry[]>(() =>
+		(entries as ClanLeaderboardEntry[]).slice(0, topCount)
+	);
 	const weightedWinsSummary = $derived.by(() => {
 		if (topEntries.length === 0) return null;
 		const sorted = [...topEntries].sort((a, b) => b.weightedWins - a.weightedWins);
@@ -152,9 +154,12 @@
 					{#snippet marks({ context, visibleSeries, getBarsProps })}
 						{#if visibleSeries.length}
 							{@const barProps = getBarsProps(visibleSeries[0], 0)}
-							{#each context.flatData as d, i (d.clanTag ?? i)}
+							{#each context.flatData as rawPoint, i ((rawPoint as { clanTag?: string }).clanTag ?? i)}
+								{@const d = rawPoint as { clanTag?: string }}
 								{@const isActive =
-									(activeWeightedWinsTags && activeWeightedWinsTags.includes(d.clanTag)) ||
+									(activeWeightedWinsTags &&
+										d.clanTag !== undefined &&
+										activeWeightedWinsTags.includes(d.clanTag)) ||
 									(activeWeightedWinsTag !== null && d.clanTag === activeWeightedWinsTag)}
 								<Bar
 									data={d}
@@ -213,7 +218,7 @@
 				>
 					<GraphHelpSheet
 						title="Weighted wins (top clans)"
-						preview={weightedWinsPreview}
+						preview={weightedWinsPreview as import('svelte').Snippet<[]>}
 						class={iconButtonClass}
 					>
 						<p class={helpHeadingClass}>How to read</p>
@@ -359,13 +364,17 @@
 			{/if}
 		</Card.Header>
 		<Card.Content>
-			{@render weightedWinsChart()}
+			{@render (weightedWinsChart as import('svelte').Snippet<[]>)()}
 		</Card.Content>
 	{/snippet}
 	{#snippet weightedWinsPreview()}
-		{@render weightedWinsSection({ showHelp: false })}
+		{@render (weightedWinsSection as import('svelte').Snippet<[{ showHelp: boolean }]>)({
+			showHelp: false
+		})}
 	{/snippet}
-	{@render weightedWinsSection({ showHelp: true })}
+	{@render (weightedWinsSection as import('svelte').Snippet<[{ showHelp: boolean }]>)({
+		showHelp: true
+	})}
 </Card.Root>
 
 <Card.Root class="group">
@@ -404,8 +413,10 @@
 						{#if visibleSeries.length}
 							{#each visibleSeries as series, seriesIndex (series.key)}
 								{@const barProps = getBarsProps(series, seriesIndex)}
-								{#each context.flatData as d, i (d.clanTag ?? i)}
-									{@const isActive = activeWinsLossesTag !== null && d.clanTag === activeWinsLossesTag}
+								{#each context.flatData as rawPoint, i ((rawPoint as { clanTag?: string }).clanTag ?? i)}
+									{@const d = rawPoint as { clanTag?: string }}
+									{@const isActive =
+										activeWinsLossesTag !== null && d.clanTag === activeWinsLossesTag}
 									<Bar
 										class="lc-bars-bar"
 										data={d}
@@ -447,13 +458,13 @@
 				>
 					<GraphHelpSheet
 						title="Wins vs losses (top clans)"
-						preview={winsLossesPreview}
+						preview={winsLossesPreview as import('svelte').Snippet<[]>}
 						class={iconButtonClass}
 					>
 						<p class={helpHeadingClass}>How to read</p>
 						<p>
-							Each bar stacks wins (dark) on top of losses (light), so total height equals total games
-							played. It’s an easy way to compare both volume and success at once.
+							Each bar stacks wins (dark) on top of losses (light), so total height equals total
+							games played. It’s an easy way to compare both volume and success at once.
 						</p>
 						<p>Use this to see who is winning more than they lose, and who is just active.</p>
 						<ul class="list-disc pl-4">
@@ -499,13 +510,17 @@
 			{/if}
 		</Card.Header>
 		<Card.Content>
-			{@render winsLossesChart()}
+			{@render (winsLossesChart as import('svelte').Snippet<[]>)()}
 		</Card.Content>
 	{/snippet}
 	{#snippet winsLossesPreview()}
-		{@render winsLossesSection({ showHelp: false })}
+		{@render (winsLossesSection as import('svelte').Snippet<[{ showHelp: boolean }]>)({
+			showHelp: false
+		})}
 	{/snippet}
-	{@render winsLossesSection({ showHelp: true })}
+	{@render (winsLossesSection as import('svelte').Snippet<[{ showHelp: boolean }]>)({
+		showHelp: true
+	})}
 </Card.Root>
 
 <Card.Root class="group">
@@ -537,7 +552,8 @@
 					{#snippet marks({ context, visibleSeries, getBarsProps })}
 						{#if visibleSeries.length}
 							{@const barProps = getBarsProps(visibleSeries[0], 0)}
-							{#each context.flatData as d, i (d.clanTag ?? i)}
+							{#each context.flatData as rawPoint, i ((rawPoint as { clanTag?: string }).clanTag ?? i)}
+								{@const d = rawPoint as { clanTag?: string }}
 								{@const isActive = activeGamesTag !== null && d.clanTag === activeGamesTag}
 								<Bar
 									class="lc-bars-bar"
@@ -597,11 +613,15 @@
 				<div
 					class="pointer-events-none flex items-center gap-1 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100"
 				>
-					<GraphHelpSheet title="Games played (top clans)" preview={gamesPreview} class={iconButtonClass}>
+					<GraphHelpSheet
+						title="Games played (top clans)"
+						preview={gamesPreview as import('svelte').Snippet<[]>}
+						class={iconButtonClass}
+					>
 						<p class={helpHeadingClass}>How to read</p>
 						<p>
-							This chart is pure activity: each bar is the number of games a clan has played. No wins
-							or losses here—just volume.
+							This chart is pure activity: each bar is the number of games a clan has played. No
+							wins or losses here—just volume.
 						</p>
 						<p>Use it to spot the most active clans and the ones with smaller sample sizes.</p>
 						<ul class="list-disc pl-4">
@@ -687,11 +707,13 @@
 			{/if}
 		</Card.Header>
 		<Card.Content>
-			{@render gamesChart()}
+			{@render (gamesChart as import('svelte').Snippet<[]>)()}
 		</Card.Content>
 	{/snippet}
 	{#snippet gamesPreview()}
-		{@render gamesSection({ showHelp: false })}
+		{@render (gamesSection as import('svelte').Snippet<[{ showHelp: boolean }]>)({
+			showHelp: false
+		})}
 	{/snippet}
-	{@render gamesSection({ showHelp: true })}
+	{@render (gamesSection as import('svelte').Snippet<[{ showHelp: boolean }]>)({ showHelp: true })}
 </Card.Root>

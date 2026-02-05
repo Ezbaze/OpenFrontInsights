@@ -18,6 +18,7 @@
 	let { entries = [] } = $props<{
 		entries?: ClanLeaderboardEntry[];
 	}>();
+	const typedEntries = $derived.by<ClanLeaderboardEntry[]>(() => entries);
 
 	const hasEntries = $derived.by(() => entries.length > 0);
 	let activeWinRateBucket = $state<string | null>(null);
@@ -48,7 +49,7 @@
 		);
 	});
 	const winRateSummary = $derived.by(() => {
-		const entriesWithResults = entries.filter((entry) => entry.wins + entry.losses > 0);
+		const entriesWithResults = typedEntries.filter((entry) => entry.wins + entry.losses > 0);
 		if (entriesWithResults.length === 0) return null;
 		const total = entriesWithResults.length;
 		const above50 = entriesWithResults.filter(
@@ -103,7 +104,8 @@
 					{#snippet marks({ context, visibleSeries, getBarsProps })}
 						{#if visibleSeries.length}
 							{@const barProps = getBarsProps(visibleSeries[0], 0)}
-							{#each context.flatData as d, i (d.bucket ?? i)}
+							{#each context.flatData as rawPoint, i ((rawPoint as { bucket?: string }).bucket ?? i)}
+								{@const d = rawPoint as { bucket?: string; count?: number }}
 								{@const isActive = activeWinRateBucket !== null && d.bucket === activeWinRateBucket}
 								<Bar
 									class="lc-bars-bar"
@@ -145,7 +147,7 @@
 				>
 					<GraphHelpSheet
 						title="Win-rate distribution"
-						preview={winRatePreview}
+						preview={winRatePreview as import('svelte').Snippet<[]>}
 						class={iconButtonClass}
 					>
 						<p class={helpHeadingClass}>How to read</p>
@@ -178,8 +180,8 @@
 							{/if}
 							{#if winRateSummary}
 								<p>
-									{formatPercent((winRateSummary.above50 / winRateSummary.total) * 100)} of clans are at
-									or above 50%, and
+									{formatPercent((winRateSummary.above50 / winRateSummary.total) * 100)} of clans are
+									at or above 50%, and
 									{formatPercent((winRateSummary.above60 / winRateSummary.total) * 100)} are above 60%.
 								</p>
 								<p>
@@ -193,11 +195,15 @@
 			{/if}
 		</Card.Header>
 		<Card.Content>
-			{@render winRateChart()}
+			{@render (winRateChart as import('svelte').Snippet<[]>)()}
 		</Card.Content>
 	{/snippet}
 	{#snippet winRatePreview()}
-		{@render winRateSection({ showHelp: false })}
+		{@render (winRateSection as import('svelte').Snippet<[{ showHelp: boolean }]>)({
+			showHelp: false
+		})}
 	{/snippet}
-	{@render winRateSection({ showHelp: true })}
+	{@render (winRateSection as import('svelte').Snippet<[{ showHelp: boolean }]>)({
+		showHelp: true
+	})}
 </Card.Root>

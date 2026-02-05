@@ -12,6 +12,17 @@
 	import { invalidateAll } from '$app/navigation';
 	import { tick } from 'svelte';
 	import { toast } from 'svelte-sonner';
+	import {
+		displayNumber,
+		displayPercent,
+		displayRatio,
+		getWinRatePercent
+	} from '$lib/leaderboard/metrics';
+	import {
+		extractSessions,
+		getSessionKey,
+		getSessionStart
+	} from '$lib/components/leaderboard/charts/clan-session-utils';
 	import type { ClanLeaderboardResponse, ClanSession, ClanStats } from '$lib/types/openfront';
 	import { SvelteSet } from 'svelte/reactivity';
 
@@ -30,10 +41,13 @@
 		};
 	}>();
 
-	let clanSessions = $state<ClanSession[]>(data.clanSessions ?? []);
+	const getInitialClanSessions = () => data.clanSessions ?? [];
+	const getInitialSessionsError = () => data.errors.sessions ?? '';
+
+	let clanSessions = $state<ClanSession[]>(getInitialClanSessions());
 	let sessionsLoading = $state(true);
 	let sessionsComplete = $state(false);
-	let sessionsError = $state(data.errors.sessions ?? '');
+	let sessionsError = $state(getInitialSessionsError());
 	let sessionsLoadedChunks = $state(0);
 	let sessionsNotifiedComplete = $state(false);
 
@@ -44,33 +58,8 @@
 	const SESSION_CHUNK_MS = SESSION_CHUNK_DAYS * 24 * 60 * 60 * 1000;
 	const SESSION_MAX_CHUNKS = 260;
 
-	const numberFormatter = new Intl.NumberFormat('en-US');
 	let search = $state('');
 	const searchSuggestionLimit = 12;
-
-	const extractSessions = (payload: unknown): ClanSession[] => {
-		if (Array.isArray(payload)) return payload as ClanSession[];
-		if (
-			payload &&
-			typeof payload === 'object' &&
-			Array.isArray((payload as { sessions?: unknown }).sessions)
-		) {
-			return ((payload as { sessions: ClanSession[] }).sessions ?? []) as ClanSession[];
-		}
-		return [];
-	};
-
-	const getSessionKey = (session: ClanSession) => {
-		const candidate =
-			session.gameId ??
-			session.game ??
-			session.id ??
-			session.sessionId ??
-			session.matchId ??
-			session.gameStart;
-		if (candidate !== undefined && candidate !== null && candidate !== '') return String(candidate);
-		return JSON.stringify(session);
-	};
 
 	const fetchSessionChunk = async (
 		clanTag: string,
@@ -93,7 +82,15 @@
 		return extractSessions(json);
 	};
 
-	const loadAllSessions = async (clanTag: string) => {
+	const getInitialCursorEnd = (sessions: ClanSession[]) => {
+		const timestamps = sessions
+			.map((session) => Date.parse(String(getSessionStart(session) ?? '')))
+			.filter((value) => Number.isFinite(value));
+		if (timestamps.length === 0) return new Date();
+		return new Date(Math.min(...timestamps));
+	};
+
+	const loadAllSessions = async (clanTag: string, initialSessions: ClanSession[]) => {
 		if (!clanTag) return;
 
 		activeSessionsLoadId += 1;
@@ -105,16 +102,22 @@
 
 		sessionsLoading = true;
 		sessionsComplete = false;
-		sessionsError = '';
-		clanSessions = [];
+		sessionsError = data.errors.sessions ?? '';
 		sessionsLoadedChunks = 0;
 		sessionsNotifiedComplete = false;
 
-		const seen = new Set<string>();
+		const seen = new SvelteSet<string>();
 		const results: ClanSession[] = [];
+		for (const session of initialSessions) {
+			const key = getSessionKey(session);
+			if (seen.has(key)) continue;
+			seen.add(key);
+			results.push(session);
+		}
+		clanSessions = [...results];
 
 		try {
-			let cursorEnd = new Date();
+			let cursorEnd = getInitialCursorEnd(results);
 			let chunkCount = 0;
 			while (chunkCount < SESSION_MAX_CHUNKS) {
 				if (controller.signal.aborted || loadId !== activeSessionsLoadId) return;
@@ -139,6 +142,9 @@
 					'Reached lookback limit while loading sessions. Showing the most recent data found.';
 			}
 			sessionsComplete = true;
+			if (results.length > 0) {
+				sessionsError = '';
+			}
 		} catch (err) {
 			if (controller.signal.aborted || loadId !== activeSessionsLoadId) return;
 			console.error(`Failed to load clan sessions for ${clanTag}`, err);
@@ -154,18 +160,10 @@
 		}
 	};
 
-	const formatNumber = (value: number | null | undefined) =>
-		value === null || value === undefined ? '—' : numberFormatter.format(value);
-	const formatRatio = (value: number | null | undefined) => {
-		if (value === null || value === undefined || Number.isNaN(value)) return '—';
-		return value.toFixed(2);
-	};
-	const formatPercent = (value: number) => `${value.toFixed(1)}%`;
-	const getWinRate = (wins: number, losses: number) => {
-		const total = wins + losses;
-		if (total <= 0) return 0;
-		return (wins / total) * 100;
-	};
+	const formatNumber = displayNumber;
+	const formatRatio = displayRatio;
+	const formatPercent = displayPercent;
+	const getWinRate = getWinRatePercent;
 
 	const renderDateRange = () => {
 		if (!data.leaderboard) return '—';
@@ -193,10 +191,12 @@
 		return `${sessionsLoadedChunks} chunk${sessionsLoadedChunks === 1 ? '' : 's'} fetched`;
 	});
 
-	const tableData = $derived.by(() => (data.leaderboard ? data.leaderboard.clans : []));
+	const tableData = $derived.by(
+		() => (data.leaderboard?.clans ?? []) as ClanLeaderboardResponse['clans']
+	);
 	const rankLookup = $derived.by(
 		() =>
-			new Map(
+			new Map<string, number>(
 				tableData.map((entry, index) => [String(entry.clanTag ?? '').toUpperCase(), index + 1])
 			)
 	);
@@ -205,7 +205,9 @@
 			(entry) => String(entry.clanTag ?? '').toUpperCase() === data.clanTag.toUpperCase()
 		)
 	);
-	const clanRank = $derived.by(() => rankLookup.get(data.clanTag.toUpperCase()) ?? null);
+	const clanRank = $derived.by<number | null>(
+		() => rankLookup.get(data.clanTag.toUpperCase()) ?? null
+	);
 	const rankImages = ['/images/rank-1.png', '/images/rank-2.png', '/images/rank-3.png'];
 	const rankAccentColors = ['211 158 34', '127 141 154', '167 95 32'];
 	const rankAccent = $derived.by(() =>
@@ -288,17 +290,12 @@
 		const clanTag = data.clanTag;
 		const reloadToken = data.loadedAt;
 		void reloadToken;
-		void loadAllSessions(clanTag);
+		void loadAllSessions(clanTag, data.clanSessions ?? []);
 	});
 
 	$effect(() => {
 		if (!browser) return;
-		if (
-			sessionsComplete &&
-			!sessionsLoading &&
-			!sessionsError &&
-			!sessionsNotifiedComplete
-		) {
+		if (sessionsComplete && !sessionsLoading && !sessionsError && !sessionsNotifiedComplete) {
 			toast.success('Clan sessions loaded.');
 			sessionsNotifiedComplete = true;
 		}
@@ -400,11 +397,10 @@
 		{/if}
 
 		<ClanCharts
-			clanTag={data.clanTag.toUpperCase()}
 			clanStats={data.clanStats}
-			clanSessions={clanSessions}
-			sessionsLoading={sessionsLoading}
-			sessionsComplete={sessionsComplete}
+			{clanSessions}
+			{sessionsLoading}
+			{sessionsComplete}
 			sessionsError={hasSessionData ? '' : sessionsError}
 			hideSessions={showSessionLoadingCard}
 			onSessionFocus={handleSessionFocus}
@@ -423,8 +419,8 @@
 					<Card.Header>
 						<Card.Title class="text-xl">Loading session data</Card.Title>
 						<Card.Description>
-							Pulling recent clan sessions in weekly windows and stepping backward until no
-							more sessions are returned.
+							Pulling recent clan sessions in weekly windows and stepping backward until no more
+							sessions are returned.
 						</Card.Description>
 					</Card.Header>
 					<Card.Content class="grid gap-3">
@@ -441,8 +437,8 @@
 					</Card.Header>
 					<Card.Content>
 						<ClanSessionsTable
-							clanSessions={clanSessions}
-							sessionsLoading={sessionsLoading}
+							{clanSessions}
+							{sessionsLoading}
 							sessionsError={hasSessionData ? '' : sessionsError}
 							heightClass="h-[70vh]"
 							focusSessionKey={focusedSessionKey}

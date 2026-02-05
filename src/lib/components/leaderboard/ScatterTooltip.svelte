@@ -45,11 +45,14 @@
 	const rowValues = $derived.by(() => {
 		if (!data) return [];
 		return rows
-			.map((row) => ({
+			.map((row: RowDef) => ({
 				label: row.label,
 				value: row.value(data)
 			}))
-			.filter((row) => row.value !== null && row.value !== undefined);
+			.filter(
+				(row: { label: string; value: string | number | null | undefined }) =>
+					row.value !== null && row.value !== undefined
+			);
 	});
 
 	const actionValue = $derived.by(() => {

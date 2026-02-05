@@ -42,8 +42,6 @@
 </script>
 
 <script lang="ts">
-	import { resolve } from '$app/paths';
-
 	let {
 		class: className,
 		variant = 'default',
@@ -56,10 +54,7 @@
 		...restProps
 	}: ButtonProps = $props();
 
-	const isExternalHref = (value: string) => /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(value);
-	const resolvedHref = $derived.by(() =>
-		href ? (isExternalHref(href) ? href : resolve(href)) : undefined
-	);
+	const resolvedHref = $derived.by(() => href ?? undefined);
 </script>
 
 {#if href}

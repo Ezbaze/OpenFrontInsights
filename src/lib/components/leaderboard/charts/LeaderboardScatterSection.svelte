@@ -26,11 +26,11 @@
 	let activeScatterMode = $state<'avg' | 'strongActive' | 'strongQuiet' | 'activeStruggle' | null>(
 		null
 	);
-	let scatterZoomX = $state<unknown>(null);
-	let scatterZoomY = $state<unknown>(null);
+	let scatterZoomX = $state<import('./chart-utils').ChartDomain | null>(null);
+	let scatterZoomY = $state<import('./chart-utils').ChartDomain | null>(null);
 
 	const scatterData = $derived.by(() =>
-		entries
+		(entries as ClanLeaderboardEntry[])
 			.filter((entry) => Number.isFinite(entry.weightedWLRatio) && Number.isFinite(entry.games))
 			.map((entry) => ({
 				clanTag: entry.clanTag,
@@ -203,7 +203,8 @@
 								},
 								{
 									label: 'Player sessions',
-									value: (data) => formatNumber((data as { playerSessions?: number }).playerSessions)
+									value: (data) =>
+										formatNumber((data as { playerSessions?: number }).playerSessions)
 								}
 							]}
 						/>
@@ -238,16 +239,17 @@
 					{#if showHelp}
 						<GraphHelpSheet
 							title="Weighted W/L ratio vs games"
-							preview={scatterPreview}
+							preview={scatterPreview as import('svelte').Snippet<[]>}
 							class={iconButtonClass}
 						>
 							<p class={helpHeadingClass}>How to read</p>
 							<p>
-								Each dot is a clan. Right means more games played, up means a stronger weighted win/loss
-								ratio. Bigger dots mean more player sessions.
+								Each dot is a clan. Right means more games played, up means a stronger weighted
+								win/loss ratio. Bigger dots mean more player sessions.
 							</p>
 							<p>
-								This combines activity and performance so you can spot “strong and active” clans quickly.
+								This combines activity and performance so you can spot “strong and active” clans
+								quickly.
 							</p>
 							<ul class="list-disc pl-4">
 								<li>Top-right is the sweet spot: strong and active.</li>
@@ -322,11 +324,15 @@
 			{/if}
 		</Card.Header>
 		<Card.Content>
-			{@render scatterChart()}
+			{@render (scatterChart as import('svelte').Snippet<[]>)()}
 		</Card.Content>
 	{/snippet}
 	{#snippet scatterPreview()}
-		{@render scatterSection({ showHelp: false })}
+		{@render (scatterSection as import('svelte').Snippet<[{ showHelp: boolean }]>)({
+			showHelp: false
+		})}
 	{/snippet}
-	{@render scatterSection({ showHelp: true })}
+	{@render (scatterSection as import('svelte').Snippet<[{ showHelp: boolean }]>)({
+		showHelp: true
+	})}
 </Card.Root>

@@ -1,22 +1,12 @@
-import { error, json } from '@sveltejs/kit';
+import { createGetHandler, parseOrThrow } from '$lib/server/api-response';
 import { fetchClanStats } from '$lib/server/openfront';
+import { clanRouteParamsSchema } from '$lib/server/schemas/clan';
 import type { RequestHandler } from './$types';
 
-export const GET: RequestHandler = async ({ fetch, params, url }) => {
-	const clanTag = params.clanTag?.trim();
-	if (!clanTag) {
-		throw error(400, 'Missing clan tag.');
+export const GET: RequestHandler = createGetHandler(
+	'Failed to load clan stats.',
+	async ({ fetch, params, url }) => {
+		const { clanTag } = parseOrThrow(clanRouteParamsSchema, params);
+		return fetchClanStats(fetch, clanTag, url.searchParams);
 	}
-
-	try {
-		const data = await fetchClanStats(fetch, clanTag, url.searchParams);
-		return json(data, {
-			headers: {
-				'cache-control': 's-maxage=60, stale-while-revalidate=300'
-			}
-		});
-	} catch (err) {
-		console.error(`Failed to load clan stats for ${clanTag}`, err);
-		throw error(502, 'Failed to load clan stats.');
-	}
-};
+);

@@ -37,8 +37,8 @@
 
 	let activeOutcomeTeams = $state<number | null>(null);
 	let activeScoreMode = $state<'avg' | 'delta' | null>(null);
-	let scoreZoomX = $state<unknown>(null);
-	let scoreZoomY = $state<unknown>(null);
+	let scoreZoomX = $state<import('./chart-utils').ChartDomain | null>(null);
+	let scoreZoomY = $state<import('./chart-utils').ChartDomain | null>(null);
 
 	const outcomesByTeamCount = $derived.by(() => {
 		const map = new SvelteMap<number, { teams: number; wins: number; losses: number }>();
@@ -98,7 +98,10 @@
 				participation,
 				score,
 				totalPlayers,
-				gameCode: getSessionGameCode(session),
+				gameCode: (() => {
+					const code = getSessionGameCode(session);
+					return typeof code === 'string' || typeof code === 'number' ? code : undefined;
+				})(),
 				sessionKey: getSessionKey(session)
 			});
 		}
@@ -140,273 +143,276 @@
 </script>
 
 <Card.Root class="group lg:col-span-2">
-		{#snippet outcomesChart()}
-			<Chart.Container config={outcomesConfig} class="aspect-auto h-[240px] w-full">
-				<BarChart
-					data={outcomesByTeamCount}
-					x="teams"
-					bandPadding={0.3}
-					seriesLayout="stack"
+	{#snippet outcomesChart()}
+		<Chart.Container config={outcomesConfig} class="aspect-auto h-[240px] w-full">
+			<BarChart
+				data={outcomesByTeamCount}
+				x="teams"
+				bandPadding={0.3}
+				seriesLayout="stack"
+				padding={chartPadding}
+				series={[
+					{
+						key: 'wins',
+						label: outcomesConfig.wins.label,
+						color: outcomesConfig.wins.color
+					},
+					{
+						key: 'losses',
+						label: outcomesConfig.losses.label,
+						color: outcomesConfig.losses.color
+					}
+				]}
+				props={{
+					bars: { stroke: 'none' },
+					yAxis: { ...yAxisNoNumbers }
+				}}
+			>
+				{#snippet marks({ context, visibleSeries, getBarsProps })}
+					{#if visibleSeries.length}
+						{#each visibleSeries as series, seriesIndex (series.key)}
+							{@const barProps = getBarsProps(series, seriesIndex)}
+							{#each context.flatData as rawPoint, i ((rawPoint as { teams?: number }).teams ?? i)}
+								{@const d = rawPoint as { teams?: number }}
+								{@const isActive = activeOutcomeTeams !== null && d.teams === activeOutcomeTeams}
+								<Bar
+									class="lc-bars-bar"
+									data={d}
+									x={barProps.x}
+									y={barProps.y}
+									x1={barProps.x1}
+									y1={barProps.y1}
+									radius={barProps.radius}
+									rounded={barProps.rounded}
+									insets={barProps.insets}
+									fill={barProps.fill}
+									opacity={barProps.opacity ?? 1}
+									stroke="none"
+									strokeWidth={0}
+									style={isActive
+										? 'filter: drop-shadow(0 -1px 0 var(--foreground)) drop-shadow(1px 0 0 var(--foreground)) drop-shadow(-1px 0 0 var(--foreground));'
+										: undefined}
+								/>
+							{/each}
+						{/each}
+					{/if}
+				{/snippet}
+				{#snippet tooltip()}
+					<Chart.Tooltip />
+				{/snippet}
+			</BarChart>
+		</Chart.Container>
+	{/snippet}
+	{#snippet outcomesSection({ showHelp }: { showHelp: boolean })}
+		<Card.Header class="flex items-start justify-between gap-3">
+			<div>
+				<Card.Title class="text-base">Outcome by team count</Card.Title>
+				<Card.Description>Win/loss totals by number of teams.</Card.Description>
+			</div>
+			{#if showHelp}
+				<div
+					class="pointer-events-none flex items-center gap-1 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100"
+				>
+					<GraphHelpSheet
+						title="Outcome by team count"
+						preview={outcomesPreview as import('svelte').Snippet<[]>}
+						class={iconButtonClass}
+					>
+						<p class={helpHeadingClass}>How to read</p>
+						<p>
+							Stacked bars show wins and losses for each team count. This highlights how often the
+							clan wins at different match sizes.
+						</p>
+						<p>Use this to spot where the clan performs best.</p>
+						<ul class="list-disc pl-4">
+							<li>Higher bars mean more matches at that team count.</li>
+							<li>More dark means more wins.</li>
+						</ul>
+						{#if outcomesSummary}
+							<p class={`${helpHeadingClass} mt-3`}>What this data says</p>
+							<p>
+								Most common team count:
+								<button
+									type="button"
+									class="cursor-pointer font-semibold text-foreground/90 underline decoration-dotted underline-offset-4 hover:text-foreground"
+									onmouseenter={() => (activeOutcomeTeams = outcomesSummary.mostCommon.teams)}
+									onmouseleave={() => (activeOutcomeTeams = null)}
+									onfocus={() => (activeOutcomeTeams = outcomesSummary.mostCommon.teams)}
+									onblur={() => (activeOutcomeTeams = null)}
+								>
+									{outcomesSummary.mostCommon.teams}
+								</button>
+								teams ({formatNumber(outcomesSummary.mostCommon.total)} matches).
+							</p>
+							<p>
+								Best win rate:
+								<button
+									type="button"
+									class="cursor-pointer font-semibold text-foreground/90 underline decoration-dotted underline-offset-4 hover:text-foreground"
+									onmouseenter={() => (activeOutcomeTeams = outcomesSummary.bestRate.teams)}
+									onmouseleave={() => (activeOutcomeTeams = null)}
+									onfocus={() => (activeOutcomeTeams = outcomesSummary.bestRate.teams)}
+									onblur={() => (activeOutcomeTeams = null)}
+								>
+									{outcomesSummary.bestRate.teams}
+								</button>
+								teams at
+								{formatPercent(
+									(safeDivide(outcomesSummary.bestRate.wins, outcomesSummary.bestRate.total) ?? 0) *
+										100
+								)}.
+							</p>
+							<p>
+								Overall win rate across all team counts:
+								{formatPercent((outcomesSummary.overallRate ?? 0) * 100)}.
+							</p>
+						{/if}
+					</GraphHelpSheet>
+				</div>
+			{/if}
+		</Card.Header>
+		<Card.Content>
+			{@render (outcomesChart as import('svelte').Snippet<[]>)()}
+		</Card.Content>
+	{/snippet}
+	{#snippet outcomesPreview()}
+		{@render (outcomesSection as import('svelte').Snippet<[{ showHelp: boolean }]>)({
+			showHelp: false
+		})}
+	{/snippet}
+	{@render (outcomesSection as import('svelte').Snippet<[{ showHelp: boolean }]>)({
+		showHelp: true
+	})}
+</Card.Root>
+
+<Card.Root class="group lg:col-span-2">
+	{#snippet scoreChart()}
+		{#if scoreParticipation.length === 0}
+			<Empty.Root class="border-muted-foreground/30">
+				<h3 class="text-base font-semibold">No score data</h3>
+				<p class="text-sm text-muted-foreground">Scores are missing for recent sessions.</p>
+			</Empty.Root>
+		{:else}
+			<Chart.Container config={scoreConfig} class="min-h-[240px] w-full">
+				<ScatterChart
+					x="participation"
+					y="score"
+					xDomain={scoreZoomX ?? participationDomain}
+					yDomain={scoreZoomY ?? scoreDomain}
+					brush={createScatterBrush(({ xDomain, yDomain }) => {
+						scoreZoomX = xDomain;
+						scoreZoomY = yDomain;
+					})}
+					r="totalPlayers"
+					rRange={[3, 10]}
 					padding={chartPadding}
+					highlight={false}
+					onTooltipClick={(_, detail) => {
+						const key = (detail?.data as { sessionKey?: string })?.sessionKey;
+						if (key) onSessionFocus?.(String(key));
+					}}
 					series={[
 						{
-							key: 'wins',
-							label: outcomesConfig.wins.label,
-							color: outcomesConfig.wins.color
-						},
-						{
-							key: 'losses',
-							label: outcomesConfig.losses.label,
-							color: outcomesConfig.losses.color
+							key: 'sessions',
+							label: scoreConfig.sessions.label,
+							color: scoreConfig.sessions.color,
+							data: scoreParticipation
 						}
 					]}
 					props={{
-						bars: { stroke: 'none' },
-						yAxis: { ...yAxisNoNumbers }
+						xAxis: {
+							format: (value) => `${Math.round(Number(value) * 100)}%`
+						},
+						yAxis: { ...yAxisNoNumbers },
+						points: { class: 'cursor-pointer' }
 					}}
 				>
-					{#snippet marks({ context, visibleSeries, getBarsProps })}
-						{#if visibleSeries.length}
-							{#each visibleSeries as series, seriesIndex (series.key)}
-								{@const barProps = getBarsProps(series, seriesIndex)}
-								{#each context.flatData as d, i (d.teams ?? i)}
-									{@const isActive = activeOutcomeTeams !== null && d.teams === activeOutcomeTeams}
-									<Bar
-										class="lc-bars-bar"
-										data={d}
-										x={barProps.x}
-										y={barProps.y}
-										x1={barProps.x1}
-										y1={barProps.y1}
-										radius={barProps.radius}
-										rounded={barProps.rounded}
-										insets={barProps.insets}
-										fill={barProps.fill}
-										opacity={barProps.opacity ?? 1}
-										stroke="none"
-										strokeWidth={0}
-										style={isActive
-											? 'filter: drop-shadow(0 -1px 0 var(--foreground)) drop-shadow(1px 0 0 var(--foreground)) drop-shadow(-1px 0 0 var(--foreground));'
-											: undefined}
-									/>
-								{/each}
-							{/each}
-						{/if}
-					{/snippet}
-					{#snippet tooltip()}
-						<Chart.Tooltip />
-					{/snippet}
-				</BarChart>
-			</Chart.Container>
-		{/snippet}
-		{#snippet outcomesSection({ showHelp }: { showHelp: boolean })}
-			<Card.Header class="flex items-start justify-between gap-3">
-				<div>
-					<Card.Title class="text-base">Outcome by team count</Card.Title>
-					<Card.Description>Win/loss totals by number of teams.</Card.Description>
-				</div>
-				{#if showHelp}
-					<div
-						class="pointer-events-none flex items-center gap-1 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100"
-					>
-						<GraphHelpSheet
-							title="Outcome by team count"
-							preview={outcomesPreview}
-							class={iconButtonClass}
-						>
-							<p class={helpHeadingClass}>How to read</p>
-							<p>
-								Stacked bars show wins and losses for each team count. This highlights how often the
-								clan wins at different match sizes.
-							</p>
-							<p>Use this to spot where the clan performs best.</p>
-							<ul class="list-disc pl-4">
-								<li>Higher bars mean more matches at that team count.</li>
-								<li>More dark means more wins.</li>
-							</ul>
-							{#if outcomesSummary}
-								<p class={`${helpHeadingClass} mt-3`}>What this data says</p>
-								<p>
-									Most common team count:
-									<button
-										type="button"
-										class="cursor-pointer font-semibold text-foreground/90 underline decoration-dotted underline-offset-4 hover:text-foreground"
-										onmouseenter={() =>
-											(activeOutcomeTeams = outcomesSummary.mostCommon.teams)}
-										onmouseleave={() => (activeOutcomeTeams = null)}
-										onfocus={() => (activeOutcomeTeams = outcomesSummary.mostCommon.teams)}
-										onblur={() => (activeOutcomeTeams = null)}
-									>
-										{outcomesSummary.mostCommon.teams}
-									</button>
-									teams ({formatNumber(outcomesSummary.mostCommon.total)} matches).
-								</p>
-								<p>
-									Best win rate:
-									<button
-										type="button"
-										class="cursor-pointer font-semibold text-foreground/90 underline decoration-dotted underline-offset-4 hover:text-foreground"
-										onmouseenter={() => (activeOutcomeTeams = outcomesSummary.bestRate.teams)}
-										onmouseleave={() => (activeOutcomeTeams = null)}
-										onfocus={() => (activeOutcomeTeams = outcomesSummary.bestRate.teams)}
-										onblur={() => (activeOutcomeTeams = null)}
-									>
-										{outcomesSummary.bestRate.teams}
-									</button>
-									teams at
-									{formatPercent(
-										(safeDivide(outcomesSummary.bestRate.wins, outcomesSummary.bestRate.total) ?? 0) *
-											100
-									)}.
-								</p>
-								<p>
-									Overall win rate across all team counts:
-									{formatPercent((outcomesSummary.overallRate ?? 0) * 100)}.
-								</p>
-							{/if}
-						</GraphHelpSheet>
-					</div>
-				{/if}
-			</Card.Header>
-			<Card.Content>
-				{@render outcomesChart()}
-			</Card.Content>
-		{/snippet}
-		{#snippet outcomesPreview()}
-			{@render outcomesSection({ showHelp: false })}
-		{/snippet}
-		{@render outcomesSection({ showHelp: true })}
-	</Card.Root>
-
-	<Card.Root class="group lg:col-span-2">
-		{#snippet scoreChart()}
-			{#if scoreParticipation.length === 0}
-				<Empty.Root class="border-muted-foreground/30">
-					<h3 class="text-base font-semibold">No score data</h3>
-					<p class="text-sm text-muted-foreground">Scores are missing for recent sessions.</p>
-				</Empty.Root>
-			{:else}
-				<Chart.Container config={scoreConfig} class="min-h-[240px] w-full">
-					<ScatterChart
-						x="participation"
-						y="score"
-						xDomain={scoreZoomX ?? participationDomain}
-						yDomain={scoreZoomY ?? scoreDomain}
-						brush={createScatterBrush(({ xDomain, yDomain }) => {
-							scoreZoomX = xDomain;
-							scoreZoomY = yDomain;
-						})}
-						r="totalPlayers"
-						rRange={[3, 10]}
-						padding={chartPadding}
-						highlight={false}
-						onTooltipClick={(_, detail) => {
-							const key = (detail?.data as { sessionKey?: string })?.sessionKey;
-							if (key) onSessionFocus?.(String(key));
-						}}
-						series={[
-							{
-								key: 'sessions',
-								label: scoreConfig.sessions.label,
-								color: scoreConfig.sessions.color,
-								data: scoreParticipation
-							}
-						]}
-						props={{
-							xAxis: {
-								format: (value) => `${Math.round(Number(value) * 100)}%`
-							},
-							yAxis: { ...yAxisNoNumbers },
-							points: { class: 'cursor-pointer' }
-						}}
-					>
-						{#snippet aboveMarks({ context })}
-							{#if scoreSummary && activeScoreMode}
-								{@const xMin = Math.min(...context.xRange)}
-								{@const xMax = Math.max(...context.xRange)}
-								{@const yMin = Math.min(...context.yRange)}
-								{@const yMax = Math.max(...context.yRange)}
-								{@const xAvg = context.xScale(scoreSummary.avgParticipation)}
-								{#if activeScoreMode === 'avg' && Number.isFinite(xAvg)}
+					{#snippet aboveMarks({ context })}
+						{#if scoreSummary && activeScoreMode}
+							{@const xMin = Math.min(...context.xRange)}
+							{@const xMax = Math.max(...context.xRange)}
+							{@const yMin = Math.min(...context.yRange)}
+							{@const yMax = Math.max(...context.yRange)}
+							{@const xAvg = context.xScale(scoreSummary.avgParticipation)}
+							{#if activeScoreMode === 'avg' && Number.isFinite(xAvg)}
+								<line
+									x1={xAvg}
+									x2={xAvg}
+									y1={yMin}
+									y2={yMax}
+									class="stroke-foreground/60"
+									stroke-dasharray="4 4"
+									stroke-width="1"
+									opacity="0.9"
+									pointer-events="none"
+								/>
+							{:else if activeScoreMode === 'delta'}
+								{@const yHigh = context.yScale(scoreSummary.highAvg)}
+								{@const yLow = context.yScale(scoreSummary.lowAvg)}
+								{#if Number.isFinite(yHigh)}
 									<line
-										x1={xAvg}
-										x2={xAvg}
-										y1={yMin}
-										y2={yMax}
+										x1={xMin}
+										x2={xMax}
+										y1={yHigh}
+										y2={yHigh}
 										class="stroke-foreground/60"
 										stroke-dasharray="4 4"
 										stroke-width="1"
 										opacity="0.9"
 										pointer-events="none"
 									/>
-								{:else if activeScoreMode === 'delta'}
-									{@const yHigh = context.yScale(scoreSummary.highAvg)}
-									{@const yLow = context.yScale(scoreSummary.lowAvg)}
-									{#if Number.isFinite(yHigh)}
-										<line
-											x1={xMin}
-											x2={xMax}
-											y1={yHigh}
-											y2={yHigh}
-											class="stroke-foreground/60"
-											stroke-dasharray="4 4"
-											stroke-width="1"
-											opacity="0.9"
-											pointer-events="none"
-										/>
-									{/if}
-									{#if Number.isFinite(yLow)}
-										<line
-											x1={xMin}
-											x2={xMax}
-											y1={yLow}
-											y2={yLow}
-											class="stroke-foreground/60"
-											stroke-dasharray="4 4"
-											stroke-width="1"
-											opacity="0.9"
-											pointer-events="none"
-										/>
-									{/if}
+								{/if}
+								{#if Number.isFinite(yLow)}
+									<line
+										x1={xMin}
+										x2={xMax}
+										y1={yLow}
+										y2={yLow}
+										class="stroke-foreground/60"
+										stroke-dasharray="4 4"
+										stroke-width="1"
+										opacity="0.9"
+										pointer-events="none"
+									/>
 								{/if}
 							{/if}
-						{/snippet}
-						{#snippet tooltip()}
-							<ScatterTooltip
-								title={() => 'Session'}
-								meta={(data) => (data as { gameCode?: string | number }).gameCode ?? null}
-								metaLabelText=""
-								rows={[
-									{
-										label: 'Participation',
-										value: (data) => {
-											const value = (data as { participation?: number }).participation;
-											if (!Number.isFinite(value)) return null;
-											return `${Math.round(value * 100)}%`;
-										}
-									},
-									{
-										label: 'Score',
-										value: (data) => {
-											const value = (data as { score?: number }).score;
-											if (!Number.isFinite(value)) return null;
-											return value.toFixed(2);
-										}
-									},
-									{
-										label: 'Total players',
-										value: (data) =>
-											formatNumber((data as { totalPlayers?: number }).totalPlayers)
+						{/if}
+					{/snippet}
+					{#snippet tooltip()}
+						<ScatterTooltip
+							title={() => 'Session'}
+							meta={(data) => (data as { gameCode?: string | number }).gameCode ?? null}
+							metaLabelText=""
+							rows={[
+								{
+									label: 'Participation',
+									value: (data) => {
+										const value = (data as { participation?: number }).participation;
+										if (value === undefined || !Number.isFinite(value)) return null;
+										return `${Math.round(value * 100)}%`;
 									}
-								]}
-							/>
-						{/snippet}
-					</ScatterChart>
-				</Chart.Container>
-			{/if}
-		{/snippet}
-		{#snippet scoreSection({ showHelp }: { showHelp: boolean })}
-			<Card.Header class="flex items-start justify-between gap-3">
+								},
+								{
+									label: 'Score',
+									value: (data) => {
+										const value = (data as { score?: number }).score;
+										if (value === undefined || !Number.isFinite(value)) return null;
+										return value.toFixed(2);
+									}
+								},
+								{
+									label: 'Total players',
+									value: (data) => formatNumber((data as { totalPlayers?: number }).totalPlayers)
+								}
+							]}
+						/>
+					{/snippet}
+				</ScatterChart>
+			</Chart.Container>
+		{/if}
+	{/snippet}
+	{#snippet scoreSection({ showHelp }: { showHelp: boolean })}
+		<Card.Header class="flex items-start justify-between gap-3">
 			<div>
 				<Card.Title class="text-base">Score vs participation</Card.Title>
 				<Card.Description>Higher participation tends to lift scores.</Card.Description>
@@ -429,7 +435,11 @@
 						</button>
 					{/if}
 					{#if showHelp}
-						<GraphHelpSheet title="Score vs participation" preview={scorePreview} class={iconButtonClass}>
+						<GraphHelpSheet
+							title="Score vs participation"
+							preview={scorePreview as import('svelte').Snippet<[]>}
+							class={iconButtonClass}
+						>
 							<p class={helpHeadingClass}>How to read</p>
 							<p>
 								Each dot is a session. Right means more clan participation in the lobby, up means a
@@ -461,8 +471,12 @@
 									</button>
 								</p>
 								<p>
-									Sessions above the median participation average {formatRatio(scoreSummary.highAvg)}
-									score, while lower-participation sessions average {formatRatio(scoreSummary.lowAvg)}.
+									Sessions above the median participation average {formatRatio(
+										scoreSummary.highAvg
+									)}
+									score, while lower-participation sessions average {formatRatio(
+										scoreSummary.lowAvg
+									)}.
 								</p>
 								<p>
 									<button
@@ -488,12 +502,14 @@
 				</div>
 			{/if}
 		</Card.Header>
-			<Card.Content>
-				{@render scoreChart()}
-			</Card.Content>
-		{/snippet}
-		{#snippet scorePreview()}
-			{@render scoreSection({ showHelp: false })}
-		{/snippet}
-		{@render scoreSection({ showHelp: true })}
-	</Card.Root>
+		<Card.Content>
+			{@render (scoreChart as import('svelte').Snippet<[]>)()}
+		</Card.Content>
+	{/snippet}
+	{#snippet scorePreview()}
+		{@render (scoreSection as import('svelte').Snippet<[{ showHelp: boolean }]>)({
+			showHelp: false
+		})}
+	{/snippet}
+	{@render (scoreSection as import('svelte').Snippet<[{ showHelp: boolean }]>)({ showHelp: true })}
+</Card.Root>

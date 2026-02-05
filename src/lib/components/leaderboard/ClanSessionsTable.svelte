@@ -307,12 +307,12 @@
 
 	const estimatedRowHeight = 44;
 	const rowVirtualizer = createVirtualizer<HTMLElement, HTMLTableRowElement>({
-		count: tableRows.length,
+		count: 0,
 		getScrollElement: () => sessionsViewport,
 		estimateSize: () => estimatedRowHeight,
 		overscan: 6,
-		paddingStart: sessionsHeaderHeight,
-		getItemKey: (index) => tableRows[index]?.id ?? index
+		paddingStart: 0,
+		getItemKey: (index) => index
 	});
 
 	const measureRow = (node: HTMLTableRowElement) => {

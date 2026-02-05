@@ -2,6 +2,11 @@ const API_BASE = 'https://api.openfront.io/public';
 
 type Fetch = typeof fetch;
 
+const withQuery = (url: string, query: URLSearchParams | undefined) => {
+	const queryString = query?.toString();
+	return queryString ? `${url}?${queryString}` : url;
+};
+
 async function fetchJson<T>(fetcher: Fetch, url: string): Promise<T> {
 	const response = await fetcher(url, {
 		headers: {
@@ -25,9 +30,7 @@ export function fetchClanStats(
 	clanTag: string,
 	query: URLSearchParams | undefined
 ) {
-	const queryString = query?.toString();
-	const suffix = queryString ? `?${queryString}` : '';
-	return fetchJson(fetcher, `${API_BASE}/clan/${encodeURIComponent(clanTag)}${suffix}`);
+	return fetchJson(fetcher, withQuery(`${API_BASE}/clan/${encodeURIComponent(clanTag)}`, query));
 }
 
 export function fetchClanSessions(
@@ -35,7 +38,8 @@ export function fetchClanSessions(
 	clanTag: string,
 	query: URLSearchParams | undefined
 ) {
-	const queryString = query?.toString();
-	const suffix = queryString ? `?${queryString}` : '';
-	return fetchJson(fetcher, `${API_BASE}/clan/${encodeURIComponent(clanTag)}/sessions${suffix}`);
+	return fetchJson(
+		fetcher,
+		withQuery(`${API_BASE}/clan/${encodeURIComponent(clanTag)}/sessions`, query)
+	);
 }

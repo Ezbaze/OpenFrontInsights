@@ -157,7 +157,7 @@
 					<h1 class="text-3xl font-semibold tracking-tight">
 						<a
 							href={resolve('/')}
-							class="inline-flex items-center transition-colors hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+							class="inline-flex items-center transition-colors hover:text-foreground/80 focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:outline-none"
 							aria-label="OpenFrontInsights home"
 						>
 							OpenFrontInsights

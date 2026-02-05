@@ -3,7 +3,7 @@
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Empty from '$lib/components/ui/empty';
 	import { Bar, BarChart, LineChart } from 'layerchart';
-	import type { ClanStats } from '$lib/types/openfront';
+	import type { ClanStats, ClanStatsBreakdown } from '$lib/types/openfront';
 	import { SvelteMap } from 'svelte/reactivity';
 	import GraphHelpSheet from '../GraphHelpSheet.svelte';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -24,8 +24,8 @@
 		clanStats?: ClanStats | null;
 	}>();
 
-	let teamCountDomain = $state<unknown>(null);
-	let teamCountRatioDomain = $state<unknown>(null);
+	let teamCountDomain = $state<import('./chart-utils').ChartDomain | null>(null);
+	let teamCountRatioDomain = $state<import('./chart-utils').ChartDomain | null>(null);
 	let activeTeamType = $state<string | null>(null);
 	let activeTeamCount = $state<number | null>(null);
 	let activeTeamCountRatio = $state<number | null>(null);
@@ -91,7 +91,8 @@
 	const teamTypeData = $derived.by(() => {
 		if (!clanStats?.teamTypeWL) return [];
 
-		return Object.entries(clanStats.teamTypeWL)
+		const entries = Object.entries(clanStats.teamTypeWL) as Array<[string, ClanStatsBreakdown]>;
+		return entries
 			.map(([key, value]) => {
 				const sortKey = teamTypeSortKey(key);
 				return {
@@ -143,7 +144,8 @@
 	const teamCountData = $derived.by(() => {
 		if (!clanStats?.teamCountWL) return [];
 
-		return Object.entries(clanStats.teamCountWL)
+		const entries = Object.entries(clanStats.teamCountWL) as Array<[string, ClanStatsBreakdown]>;
+		return entries
 			.map(([key, value]) => {
 				const teams = Number(key);
 				return {
@@ -192,13 +194,14 @@
 					weightedRatio: weightedRatio !== null ? roundTo(weightedRatio) : null
 				};
 			})
-			.filter(
-				(entry) =>
+			.filter((entry): entry is { teams: number; rawRatio: number; weightedRatio: number } => {
+				return (
 					entry.rawRatio !== null &&
 					entry.weightedRatio !== null &&
 					Number.isFinite(entry.rawRatio) &&
 					Number.isFinite(entry.weightedRatio)
-			)
+				);
+			})
 	);
 	const teamCountRatioSummary = $derived.by(() => {
 		if (teamCountRatioData.length === 0) return null;
@@ -271,7 +274,8 @@
 							{#if visibleSeries.length}
 								{#each visibleSeries as series, seriesIndex (series.key)}
 									{@const barProps = getBarsProps(series, seriesIndex)}
-									{#each context.flatData as d, i (d.teamType ?? i)}
+									{#each context.flatData as rawPoint, i ((rawPoint as { teamType?: string }).teamType ?? i)}
+										{@const d = rawPoint as { teamType?: string }}
 										{@const isActive = activeTeamType !== null && d.teamType === activeTeamType}
 										<Bar
 											class="lc-bars-bar"
@@ -314,7 +318,7 @@
 					>
 						<GraphHelpSheet
 							title="Win/loss by team type"
-							preview={teamTypePreview}
+							preview={teamTypePreview as import('svelte').Snippet<[]>}
 							class={iconButtonClass}
 						>
 							<p class={helpHeadingClass}>How to read</p>
@@ -358,10 +362,8 @@
 									</button>
 									at
 									{formatPercent(
-										(safeDivide(
-											teamTypeSummary.bestRate.wins,
-											teamTypeSummary.bestRate.total
-										) ?? 0) * 100
+										(safeDivide(teamTypeSummary.bestRate.wins, teamTypeSummary.bestRate.total) ??
+											0) * 100
 									)}.
 								</p>
 								<p>
@@ -378,10 +380,8 @@
 									</button>
 									at
 									{formatPercent(
-										(safeDivide(
-											teamTypeSummary.worstRate.wins,
-											teamTypeSummary.worstRate.total
-										) ?? 0) * 100
+										(safeDivide(teamTypeSummary.worstRate.wins, teamTypeSummary.worstRate.total) ??
+											0) * 100
 									)}.
 								</p>
 								{#if teamTypeSummary.bestRate.teamType !== teamTypeSummary.mostPlayed.teamType}
@@ -395,13 +395,17 @@
 				{/if}
 			</Card.Header>
 			<Card.Content>
-				{@render teamTypeChart()}
+				{@render (teamTypeChart as import('svelte').Snippet<[]>)()}
 			</Card.Content>
 		{/snippet}
 		{#snippet teamTypePreview()}
-			{@render teamTypeSection({ showHelp: false })}
+			{@render (teamTypeSection as import('svelte').Snippet<[{ showHelp: boolean }]>)({
+				showHelp: false
+			})}
 		{/snippet}
-		{@render teamTypeSection({ showHelp: true })}
+		{@render (teamTypeSection as import('svelte').Snippet<[{ showHelp: boolean }]>)({
+			showHelp: true
+		})}
 	</Card.Root>
 
 	<Card.Root class="group">
@@ -485,7 +489,7 @@
 						{#if showHelp}
 							<GraphHelpSheet
 								title="Win/loss by team count"
-								preview={teamCountPreview}
+								preview={teamCountPreview as import('svelte').Snippet<[]>}
 								class={iconButtonClass}
 							>
 								<p class={helpHeadingClass}>How to read</p>
@@ -505,8 +509,7 @@
 										<button
 											type="button"
 											class="cursor-pointer font-semibold text-foreground/90 underline decoration-dotted underline-offset-4 hover:text-foreground"
-											onmouseenter={() =>
-												(activeTeamCount = teamCountSummary.mostPlayed.teams)}
+											onmouseenter={() => (activeTeamCount = teamCountSummary.mostPlayed.teams)}
 											onmouseleave={() => (activeTeamCount = null)}
 											onfocus={() => (activeTeamCount = teamCountSummary.mostPlayed.teams)}
 											onblur={() => (activeTeamCount = null)}
@@ -520,8 +523,7 @@
 										<button
 											type="button"
 											class="cursor-pointer font-semibold text-foreground/90 underline decoration-dotted underline-offset-4 hover:text-foreground"
-											onmouseenter={() =>
-												(activeTeamCount = teamCountSummary.bestRate.teams)}
+											onmouseenter={() => (activeTeamCount = teamCountSummary.bestRate.teams)}
 											onmouseleave={() => (activeTeamCount = null)}
 											onfocus={() => (activeTeamCount = teamCountSummary.bestRate.teams)}
 											onblur={() => (activeTeamCount = null)}
@@ -541,8 +543,7 @@
 										<button
 											type="button"
 											class="cursor-pointer font-semibold text-foreground/90 underline decoration-dotted underline-offset-4 hover:text-foreground"
-											onmouseenter={() =>
-												(activeTeamCount = teamCountSummary.worstRate.teams)}
+											onmouseenter={() => (activeTeamCount = teamCountSummary.worstRate.teams)}
 											onmouseleave={() => (activeTeamCount = null)}
 											onfocus={() => (activeTeamCount = teamCountSummary.worstRate.teams)}
 											onblur={() => (activeTeamCount = null)}
@@ -564,13 +565,17 @@
 				{/if}
 			</Card.Header>
 			<Card.Content>
-				{@render teamCountChart()}
+				{@render (teamCountChart as import('svelte').Snippet<[]>)()}
 			</Card.Content>
 		{/snippet}
 		{#snippet teamCountPreview()}
-			{@render teamCountSection({ showHelp: false })}
+			{@render (teamCountSection as import('svelte').Snippet<[{ showHelp: boolean }]>)({
+				showHelp: false
+			})}
 		{/snippet}
-		{@render teamCountSection({ showHelp: true })}
+		{@render (teamCountSection as import('svelte').Snippet<[{ showHelp: boolean }]>)({
+			showHelp: true
+		})}
 	</Card.Root>
 
 	<Card.Root class="group lg:col-span-2">
@@ -654,7 +659,7 @@
 						{#if showHelp}
 							<GraphHelpSheet
 								title="Weighted vs raw W/L ratio"
-								preview={teamCountRatioPreview}
+								preview={teamCountRatioPreview as import('svelte').Snippet<[]>}
 								class={iconButtonClass}
 							>
 								<p class={helpHeadingClass}>How to read</p>
@@ -683,8 +688,8 @@
 										>
 											{teamCountRatioSummary.biggestGap.teams}
 										</button>
-										teams: weighted {formatRatio(teamCountRatioSummary.biggestGap.weightedRatio)} vs
-										raw {formatRatio(teamCountRatioSummary.biggestGap.rawRatio)}.
+										teams: weighted {formatRatio(teamCountRatioSummary.biggestGap.weightedRatio)} vs raw
+										{formatRatio(teamCountRatioSummary.biggestGap.rawRatio)}.
 									</p>
 									<p>
 										Weighted ratio is higher in
@@ -699,12 +704,16 @@
 				{/if}
 			</Card.Header>
 			<Card.Content>
-				{@render teamCountRatioChart()}
+				{@render (teamCountRatioChart as import('svelte').Snippet<[]>)()}
 			</Card.Content>
 		{/snippet}
 		{#snippet teamCountRatioPreview()}
-			{@render teamCountRatioSection({ showHelp: false })}
+			{@render (teamCountRatioSection as import('svelte').Snippet<[{ showHelp: boolean }]>)({
+				showHelp: false
+			})}
 		{/snippet}
-		{@render teamCountRatioSection({ showHelp: true })}
+		{@render (teamCountRatioSection as import('svelte').Snippet<[{ showHelp: boolean }]>)({
+			showHelp: true
+		})}
 	</Card.Root>
 </div>

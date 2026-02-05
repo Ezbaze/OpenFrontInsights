@@ -19,17 +19,23 @@
 		renderComponent,
 		renderSnippet
 	} from '$lib/components/ui/data-table';
-	import { resolve } from '$app/paths';
 	import DataTableSortHeader from './DataTableSortHeader.svelte';
 	import ClanCharts from './ClanCharts.svelte';
 	import type { ClanStats } from '$lib/types/openfront';
+	import {
+		getSessionClanPlayers,
+		getSessionGameCode,
+		getSessionHasWon,
+		getSessionNumTeams,
+		getSessionStart,
+		getSessionTotalPlayers
+	} from './charts/clan-session-utils';
 
 	type ClanSession = Record<string, unknown>;
 	type ColumnMeta = { align?: 'right' };
 
 	let {
 		dialogOpen = $bindable(false),
-		clanTag = null,
 		clanLoading = false,
 		clanStats = null,
 		clanError = '',
@@ -39,7 +45,6 @@
 		getSessionKey
 	} = $props<{
 		dialogOpen?: boolean;
-		clanTag?: string | null;
 		clanLoading?: boolean;
 		clanStats?: ClanStats | null;
 		clanError?: string;
@@ -63,22 +68,21 @@
 	};
 
 	const getSessionResult = (session: ClanSession) => {
-		if (typeof session.hasWon === 'boolean') return session.hasWon ? 'Win' : 'Loss';
+		const hasWon = getSessionHasWon(session);
+		if (hasWon === true) return 'Win';
+		if (hasWon === false) return 'Loss';
 		const result = session.result ?? session.outcome ?? session.status;
 		return result ? String(result) : '—';
 	};
 
 	const rawValues = {
-		game: (session: ClanSession) =>
-			session.gameId ?? session.game ?? session.id ?? session.sessionId ?? session.matchId,
-		start: (session: ClanSession) =>
-			session.start ?? session.startedAt ?? session.startTime ?? session.createdAt,
+		game: (session: ClanSession) => getSessionGameCode(session),
+		start: (session: ClanSession) => getSessionStart(session),
 		end: (session: ClanSession) => session.end ?? session.endedAt ?? session.endTime,
 		result: (session: ClanSession) => getSessionResult(session),
-		teams: (session: ClanSession) => session.numTeams ?? session.teams,
-		clanPlayers: (session: ClanSession) => session.clanPlayerCount ?? session.clanPlayers,
-		players: (session: ClanSession) =>
-			session.totalPlayerCount ?? session.playerCount ?? session.players
+		teams: (session: ClanSession) => getSessionNumTeams(session),
+		clanPlayers: (session: ClanSession) => getSessionClanPlayers(session),
+		players: (session: ClanSession) => getSessionTotalPlayers(session)
 	} as const;
 
 	const getGameUrl = (session: ClanSession) => {
@@ -355,7 +359,7 @@
 	{#if href}
 		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 		<a
-			href={href ? (href.startsWith('http') ? href : resolve(href)) : undefined}
+			href={href ?? undefined}
 			target="_blank"
 			rel="noopener noreferrer"
 			class="text-primary underline-offset-4 hover:underline"
@@ -390,7 +394,7 @@
 					<Alert.Description>{clanError}</Alert.Description>
 				</Alert.Root>
 			{:else}
-				<ClanCharts {clanTag} {clanStats} {clanSessions} {sessionsLoading} />
+				<ClanCharts {clanStats} {clanSessions} {sessionsLoading} />
 			{/if}
 
 			<div class="text-lg font-semibold">Recent games</div>

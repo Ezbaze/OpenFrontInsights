@@ -12,8 +12,8 @@
 		class: className
 	} = $props<{
 		title: string;
-		preview: Snippet;
-		children?: Snippet;
+		preview: Snippet<[]>;
+		children?: Snippet<[]>;
 		class?: string;
 	}>();
 

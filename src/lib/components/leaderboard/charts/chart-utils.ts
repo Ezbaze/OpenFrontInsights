@@ -1,3 +1,5 @@
+export type ChartDomain = Array<string | number | Date | null | undefined> | null | undefined;
+
 export const numberFormatter = new Intl.NumberFormat('en-US');
 export const percentFormatter = new Intl.NumberFormat('en-US', {
 	maximumFractionDigits: 1,
@@ -7,7 +9,9 @@ export const percentFormatter = new Intl.NumberFormat('en-US', {
 export const roundTo = (value: number, digits = 2) => Number(value.toFixed(digits));
 
 export const formatNumber = (value: number | null | undefined) =>
-	value === null || value === undefined || Number.isNaN(value) ? null : numberFormatter.format(value);
+	value === null || value === undefined || Number.isNaN(value)
+		? null
+		: numberFormatter.format(value);
 
 export const formatPercent = (value: number | null | undefined) =>
 	value === null || value === undefined || Number.isNaN(value)
@@ -24,7 +28,7 @@ export const getDomain = (
 	values: number[],
 	padRatio = 0.08,
 	clamp?: { min?: number; max?: number }
-) => {
+): ChartDomain | undefined => {
 	const clean = values.filter((value) => Number.isFinite(value));
 	if (clean.length === 0) return undefined;
 	const min = Math.min(...clean);
@@ -43,20 +47,20 @@ export const getDomain = (
 export const formatDateLabel = (value: Date) =>
 	value.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' });
 
-export const createLineBrush = (setDomain: (value: unknown) => void) => ({
-	axis: 'x',
+export const createLineBrush = (setDomain: (value: ChartDomain | null) => void) => ({
+	axis: 'x' as const,
 	resetOnEnd: true,
-	onBrushEnd: (event: { xDomain?: unknown }) => {
+	onBrushEnd: (event: { xDomain: ChartDomain | null }) => {
 		setDomain(event?.xDomain ?? null);
 	}
 });
 
 export const createScatterBrush = (
-	setDomains: (value: { xDomain: unknown | null; yDomain: unknown | null }) => void
+	setDomains: (value: { xDomain: ChartDomain | null; yDomain: ChartDomain | null }) => void
 ) => ({
-	axis: 'both',
+	axis: 'both' as const,
 	resetOnEnd: true,
-	onBrushEnd: (event: { xDomain?: unknown; yDomain?: unknown }) => {
+	onBrushEnd: (event: { xDomain: ChartDomain | null; yDomain: ChartDomain | null }) => {
 		setDomains({
 			xDomain: event?.xDomain ?? null,
 			yDomain: event?.yDomain ?? null
@@ -68,4 +72,5 @@ export const yAxisNoNumbers = { tickLabelProps: { class: 'hidden' } } as const;
 export const chartPadding = { left: 12, right: 12, top: 4, bottom: 24 };
 export const iconButtonClass =
 	'inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60';
-export const helpHeadingClass = 'text-xs font-semibold uppercase tracking-wide text-muted-foreground/70';
+export const helpHeadingClass =
+	'text-xs font-semibold uppercase tracking-wide text-muted-foreground/70';
