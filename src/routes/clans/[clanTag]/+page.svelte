@@ -10,7 +10,7 @@
 	import * as Table from '$lib/components/ui/table';
 	import { browser } from '$app/environment';
 	import { invalidateAll } from '$app/navigation';
-	import { tick } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import {
 		displayNumber,
@@ -53,6 +53,7 @@
 
 	let activeSessionsLoadId = 0;
 	let activeSessionsAbort: AbortController | null = null;
+	let sessionsMounted = $state(false);
 
 	const SESSION_CHUNK_DAYS = 7;
 	const SESSION_CHUNK_MS = SESSION_CHUNK_DAYS * 24 * 60 * 60 * 1000;
@@ -285,8 +286,12 @@
 		focusedSessionKey = sessionKey;
 	};
 
+	onMount(() => {
+		sessionsMounted = true;
+	});
+
 	$effect(() => {
-		if (!browser) return;
+		if (!browser || !sessionsMounted) return;
 		const clanTag = data.clanTag;
 		const reloadToken = data.loadedAt;
 		void reloadToken;

@@ -11,7 +11,8 @@
 	} from '$lib/leaderboard/metrics';
 	import type { ClanLeaderboardResponse } from '$lib/types/openfront';
 	import { SvelteSet } from 'svelte/reactivity';
-	import { goto } from '$app/navigation';
+	import { browser } from '$app/environment';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { tick } from 'svelte';
 
@@ -35,15 +36,10 @@
 		errorMessage = '';
 
 		try {
-			const response = await fetch('/api/clans/leaderboard');
-			if (!response.ok) {
-				throw new Error(`Unexpected status ${response.status}`);
-			}
-			const json = (await response.json()) as ClanLeaderboardResponse;
-			leaderboard = json;
+			await invalidateAll();
 			lastUpdated = new Date();
 		} catch (err) {
-			console.error('Failed to load leaderboard', err);
+			console.error('Failed to refresh leaderboard', err);
 			errorMessage = 'Unable to load the clan leaderboard right now.';
 		} finally {
 			isLoading = false;
@@ -83,6 +79,7 @@
 	});
 
 	$effect(() => {
+		if (!browser) return;
 		if (leaderboard || data?.leaderboard) return;
 		void refreshLeaderboard();
 	});
