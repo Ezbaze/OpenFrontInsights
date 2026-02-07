@@ -2,7 +2,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Empty from '$lib/components/ui/empty';
-	import { Bar, BarChart } from 'layerchart';
+	import { BarChart, Highlight } from 'layerchart';
 	import type { ClanLeaderboardEntry } from '$lib/types/openfront';
 	import GraphHelpSheet from '../GraphHelpSheet.svelte';
 	import {
@@ -41,6 +41,11 @@
 
 		return buckets;
 	});
+	const activeWinRateDatum = $derived.by(() =>
+		activeWinRateBucket === null
+			? undefined
+			: winRateBuckets.find((bucket) => bucket.bucket === activeWinRateBucket)
+	);
 	const winRatePeak = $derived.by(() => {
 		if (!hasEntries) return null;
 		return winRateBuckets.reduce(
@@ -84,6 +89,7 @@
 				<BarChart
 					data={winRateBuckets}
 					x="bucket"
+					highlight={false}
 					bandPadding={0.2}
 					padding={chartPadding}
 					series={[
@@ -101,32 +107,8 @@
 						yAxis: { ...yAxisNoNumbers }
 					}}
 				>
-					{#snippet marks({ context, visibleSeries, getBarsProps })}
-						{#if visibleSeries.length}
-							{@const barProps = getBarsProps(visibleSeries[0], 0)}
-							{#each context.flatData as rawPoint, i ((rawPoint as { bucket?: string }).bucket ?? i)}
-								{@const d = rawPoint as { bucket?: string; count?: number }}
-								{@const isActive = activeWinRateBucket !== null && d.bucket === activeWinRateBucket}
-								<Bar
-									class="lc-bars-bar"
-									data={d}
-									x={barProps.x}
-									y={barProps.y}
-									x1={barProps.x1}
-									y1={barProps.y1}
-									radius={barProps.radius}
-									rounded={barProps.rounded}
-									insets={barProps.insets}
-									fill={barProps.fill}
-									opacity={barProps.opacity ?? 1}
-									stroke="none"
-									strokeWidth={0}
-									style={isActive
-										? 'filter: drop-shadow(0 -1px 0 var(--foreground)) drop-shadow(1px 0 0 var(--foreground)) drop-shadow(-1px 0 0 var(--foreground));'
-										: undefined}
-								/>
-							{/each}
-						{/if}
+					{#snippet belowMarks()}
+						<Highlight data={activeWinRateDatum} area={{ class: 'fill-muted' }} />
 					{/snippet}
 					{#snippet tooltip()}
 						<Chart.Tooltip />

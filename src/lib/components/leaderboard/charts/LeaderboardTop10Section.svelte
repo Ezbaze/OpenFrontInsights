@@ -2,7 +2,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Empty from '$lib/components/ui/empty';
-	import { Bar, BarChart } from 'layerchart';
+	import { BarChart, Highlight } from 'layerchart';
 	import type { ClanLeaderboardEntry } from '$lib/types/openfront';
 	import GraphHelpSheet from '../GraphHelpSheet.svelte';
 	import {
@@ -46,7 +46,7 @@
 			lead,
 			top3Share,
 			total,
-			top3Tags: sorted.slice(0, 3).map((e) => e.clanTag)
+			top3Tags: sorted.slice(0, 3).map((entry) => entry.clanTag)
 		};
 	});
 	const mostGamesEntry = $derived.by(() => {
@@ -98,6 +98,23 @@
 			games: entry.games
 		}))
 	);
+	const activeWeightedWinsData = $derived.by(() => {
+		const hoverTags = activeWeightedWinsTags ?? [];
+		if (hoverTags.length > 0) {
+			return weightedWinsData.filter((entry) => hoverTags.includes(entry.clanTag));
+		}
+		if (activeWeightedWinsTag === null) return [];
+		const activeDatum = weightedWinsData.find((entry) => entry.clanTag === activeWeightedWinsTag);
+		return activeDatum ? [activeDatum] : [];
+	});
+	const activeWinsLossesDatum = $derived.by(() =>
+		activeWinsLossesTag === null
+			? undefined
+			: winsLossesData.find((entry) => entry.clanTag === activeWinsLossesTag)
+	);
+	const activeGamesDatum = $derived.by(() =>
+		activeGamesTag === null ? undefined : gamesData.find((entry) => entry.clanTag === activeGamesTag)
+	);
 
 	const weightedWinsConfig = {
 		weightedWins: {
@@ -137,6 +154,7 @@
 				<BarChart
 					data={weightedWinsData}
 					x="clanTag"
+					highlight={false}
 					bandPadding={0.3}
 					padding={chartPadding}
 					series={[
@@ -151,52 +169,29 @@
 						yAxis: { ...yAxisNoNumbers }
 					}}
 				>
-					{#snippet marks({ context, visibleSeries, getBarsProps })}
-						{#if visibleSeries.length}
-							{@const barProps = getBarsProps(visibleSeries[0], 0)}
-							{#each context.flatData as rawPoint, i ((rawPoint as { clanTag?: string }).clanTag ?? i)}
-								{@const d = rawPoint as { clanTag?: string }}
-								{@const isActive =
-									(activeWeightedWinsTags &&
-										d.clanTag !== undefined &&
-										activeWeightedWinsTags.includes(d.clanTag)) ||
-									(activeWeightedWinsTag !== null && d.clanTag === activeWeightedWinsTag)}
-								<Bar
-									data={d}
-									x={barProps.x}
-									y={barProps.y}
-									x1={barProps.x1}
-									y1={barProps.y1}
-									radius={barProps.radius}
-									rounded={barProps.rounded}
-									insets={barProps.insets}
-									fill={barProps.fill}
-									opacity={barProps.opacity ?? 1}
-									stroke="none"
-									strokeWidth={0}
-									style={isActive
-										? 'filter: drop-shadow(0 -1px 0 var(--foreground)) drop-shadow(1px 0 0 var(--foreground)) drop-shadow(-1px 0 0 var(--foreground));'
-										: undefined}
-								/>
+					{#snippet belowMarks()}
+						{#each activeWeightedWinsData as activeDatum (activeDatum.clanTag)}
+							<Highlight data={activeDatum} area={{ class: 'fill-muted' }} />
+						{/each}
+					{/snippet}
+					{#snippet aboveMarks({ context })}
+						{#if activeWeightedWinsValues && Array.isArray(context.xRange)}
+							{#each activeWeightedWinsValues as value (value)}
+								{@const yValue = context.yScale(value)}
+								{#if Number.isFinite(yValue)}
+									<line
+										x1={context.xRange[0]}
+										x2={context.xRange[1]}
+										y1={yValue}
+										y2={yValue}
+										class="stroke-foreground/60"
+										stroke-dasharray="4 4"
+										stroke-width="1"
+										opacity="0.9"
+										pointer-events="none"
+									/>
+								{/if}
 							{/each}
-							{#if activeWeightedWinsValues && Array.isArray(context.xRange)}
-								{#each activeWeightedWinsValues as value (value)}
-									{@const yValue = context.yScale(value)}
-									{#if Number.isFinite(yValue)}
-										<line
-											x1={context.xRange[0]}
-											x2={context.xRange[1]}
-											y1={yValue}
-											y2={yValue}
-											class="stroke-foreground/60"
-											stroke-dasharray="4 4"
-											stroke-width="1"
-											opacity="0.9"
-											pointer-events="none"
-										/>
-									{/if}
-								{/each}
-							{/if}
 						{/if}
 					{/snippet}
 					{#snippet tooltip()}
@@ -264,13 +259,21 @@
 										activeWeightedWinsTags = null;
 										activeWeightedWinsValues = [weightedWinsSummary.leader.weightedWins];
 									}}
-									onmouseleave={() => (activeWeightedWinsValues = null)}
+									onmouseleave={() => {
+										activeWeightedWinsValues = null;
+										activeWeightedWinsTags = null;
+										activeWeightedWinsTag = null;
+									}}
 									onfocus={() => {
 										activeWeightedWinsTag = null;
 										activeWeightedWinsTags = null;
 										activeWeightedWinsValues = [weightedWinsSummary.leader.weightedWins];
 									}}
-									onblur={() => (activeWeightedWinsValues = null)}
+									onblur={() => {
+										activeWeightedWinsValues = null;
+										activeWeightedWinsTags = null;
+										activeWeightedWinsTag = null;
+									}}
 								>
 									{formatNumber(weightedWinsSummary.leader.weightedWins)}
 								</button>
@@ -301,31 +304,35 @@
 									<button
 										type="button"
 										class="cursor-pointer font-semibold text-foreground/90 underline decoration-dotted underline-offset-4 hover:text-foreground"
-										onmouseenter={() => {
-											activeWeightedWinsTag = null;
-											activeWeightedWinsTags = null;
-											activeWeightedWinsValues = weightedWinsSummary.runner
-												? [
-														weightedWinsSummary.leader.weightedWins,
+									onmouseenter={() => {
+										activeWeightedWinsTag = null;
+										activeWeightedWinsTags = null;
+										activeWeightedWinsValues = weightedWinsSummary.runner
+											? [
+													weightedWinsSummary.leader.weightedWins,
 														weightedWinsSummary.runner.weightedWins
 													]
 												: [weightedWinsSummary.leader.weightedWins];
 										}}
 										onmouseleave={() => {
 											activeWeightedWinsValues = null;
-										}}
-										onfocus={() => {
-											activeWeightedWinsTag = null;
 											activeWeightedWinsTags = null;
-											activeWeightedWinsValues = weightedWinsSummary.runner
-												? [
-														weightedWinsSummary.leader.weightedWins,
+											activeWeightedWinsTag = null;
+										}}
+									onfocus={() => {
+										activeWeightedWinsTag = null;
+										activeWeightedWinsTags = null;
+										activeWeightedWinsValues = weightedWinsSummary.runner
+											? [
+													weightedWinsSummary.leader.weightedWins,
 														weightedWinsSummary.runner.weightedWins
 													]
 												: [weightedWinsSummary.leader.weightedWins];
 										}}
 										onblur={() => {
 											activeWeightedWinsValues = null;
+											activeWeightedWinsTags = null;
+											activeWeightedWinsTag = null;
 										}}
 									>
 										{formatNumber(weightedWinsSummary.lead)}
@@ -389,6 +396,7 @@
 				<BarChart
 					data={winsLossesData}
 					x="clanTag"
+					highlight={false}
 					bandPadding={0.3}
 					seriesLayout="stack"
 					padding={chartPadding}
@@ -409,35 +417,8 @@
 						yAxis: { ...yAxisNoNumbers }
 					}}
 				>
-					{#snippet marks({ context, visibleSeries, getBarsProps })}
-						{#if visibleSeries.length}
-							{#each visibleSeries as series, seriesIndex (series.key)}
-								{@const barProps = getBarsProps(series, seriesIndex)}
-								{#each context.flatData as rawPoint, i ((rawPoint as { clanTag?: string }).clanTag ?? i)}
-									{@const d = rawPoint as { clanTag?: string }}
-									{@const isActive =
-										activeWinsLossesTag !== null && d.clanTag === activeWinsLossesTag}
-									<Bar
-										class="lc-bars-bar"
-										data={d}
-										x={barProps.x}
-										y={barProps.y}
-										x1={barProps.x1}
-										y1={barProps.y1}
-										radius={barProps.radius}
-										rounded={barProps.rounded}
-										insets={barProps.insets}
-										fill={barProps.fill}
-										opacity={barProps.opacity ?? 1}
-										stroke="none"
-										strokeWidth={0}
-										style={isActive
-											? 'filter: drop-shadow(0 -1px 0 var(--foreground)) drop-shadow(1px 0 0 var(--foreground)) drop-shadow(-1px 0 0 var(--foreground));'
-											: undefined}
-									/>
-								{/each}
-							{/each}
-						{/if}
+					{#snippet belowMarks()}
+						<Highlight data={activeWinsLossesDatum} area={{ class: 'fill-muted' }} />
 					{/snippet}
 					{#snippet tooltip()}
 						<Chart.Tooltip />
@@ -535,6 +516,7 @@
 				<BarChart
 					data={gamesData}
 					x="clanTag"
+					highlight={false}
 					bandPadding={0.3}
 					padding={chartPadding}
 					series={[
@@ -549,51 +531,29 @@
 						yAxis: { ...yAxisNoNumbers }
 					}}
 				>
-					{#snippet marks({ context, visibleSeries, getBarsProps })}
-						{#if visibleSeries.length}
-							{@const barProps = getBarsProps(visibleSeries[0], 0)}
-							{#each context.flatData as rawPoint, i ((rawPoint as { clanTag?: string }).clanTag ?? i)}
-								{@const d = rawPoint as { clanTag?: string }}
-								{@const isActive = activeGamesTag !== null && d.clanTag === activeGamesTag}
-								<Bar
-									class="lc-bars-bar"
-									data={d}
-									x={barProps.x}
-									y={barProps.y}
-									x1={barProps.x1}
-									y1={barProps.y1}
-									radius={barProps.radius}
-									rounded={barProps.rounded}
-									insets={barProps.insets}
-									fill={barProps.fill}
-									opacity={barProps.opacity ?? 1}
-									stroke="none"
-									strokeWidth={0}
-									style={isActive
-										? 'filter: drop-shadow(0 -1px 0 var(--foreground)) drop-shadow(1px 0 0 var(--foreground)) drop-shadow(-1px 0 0 var(--foreground));'
-										: undefined}
-								/>
+					{#snippet belowMarks()}
+						<Highlight data={activeGamesDatum} area={{ class: 'fill-muted' }} />
+					{/snippet}
+					{#snippet aboveMarks({ context })}
+						{#if activeGamesValues && Array.isArray(context.xRange)}
+							{@const xStart = context.xRange[0]}
+							{@const xEnd = context.xRange[1]}
+							{#each activeGamesValues as value (value)}
+								{@const yValue = context.yScale(value)}
+								{#if Number.isFinite(yValue)}
+									<line
+										x1={xStart}
+										x2={xEnd}
+										y1={yValue}
+										y2={yValue}
+										class="stroke-foreground/60"
+										stroke-dasharray="4 4"
+										stroke-width="1"
+										opacity="0.9"
+										pointer-events="none"
+									/>
+								{/if}
 							{/each}
-							{#if activeGamesValues && Array.isArray(context.xRange)}
-								{@const xStart = context.xRange[0]}
-								{@const xEnd = context.xRange[1]}
-								{#each activeGamesValues as value (value)}
-									{@const yValue = context.yScale(value)}
-									{#if Number.isFinite(yValue)}
-										<line
-											x1={xStart}
-											x2={xEnd}
-											y1={yValue}
-											y2={yValue}
-											class="stroke-foreground/60"
-											stroke-dasharray="4 4"
-											stroke-width="1"
-											opacity="0.9"
-											pointer-events="none"
-										/>
-									{/if}
-								{/each}
-							{/if}
 						{/if}
 					{/snippet}
 					{#snippet tooltip()}

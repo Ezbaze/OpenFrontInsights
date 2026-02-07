@@ -2,7 +2,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Empty from '$lib/components/ui/empty';
-	import { Bar, BarChart, LineChart } from 'layerchart';
+	import { BarChart, Highlight, LineChart } from 'layerchart';
 	import type { ClanSession } from '$lib/types/openfront';
 	import { SvelteMap } from 'svelte/reactivity';
 	import GraphHelpSheet from '../GraphHelpSheet.svelte';
@@ -128,6 +128,11 @@
 
 		return buckets;
 	});
+	const activeParticipationDatum = $derived.by(() =>
+		activeParticipationBucket === null
+			? undefined
+			: participationBuckets.find((bucket) => bucket.bucket === activeParticipationBucket)
+	);
 	const participationSummary = $derived.by(() => {
 		const samples = clanSessions
 			.map((session: ClanSession) => {
@@ -170,6 +175,11 @@
 
 		return buckets;
 	});
+	const activeClanSizeDatum = $derived.by(() =>
+		activeClanSizeBucket === null
+			? undefined
+			: clanSizeBuckets.find((bucket) => bucket.bucket === activeClanSizeBucket)
+	);
 	const clanSizeSummary = $derived.by(() => {
 		if (clanSizeBuckets.length === 0) return null;
 		const total = clanSizeBuckets.reduce((sum, entry) => sum + entry.count, 0);
@@ -374,6 +384,7 @@
 			<BarChart
 				data={participationBuckets}
 				x="bucket"
+				highlight={false}
 				bandPadding={0.2}
 				padding={chartPadding}
 				series={[
@@ -388,33 +399,8 @@
 					yAxis: { ...yAxisNoNumbers }
 				}}
 			>
-				{#snippet marks({ context, visibleSeries, getBarsProps })}
-					{#if visibleSeries.length}
-						{@const barProps = getBarsProps(visibleSeries[0], 0)}
-						{#each context.flatData as rawPoint, i ((rawPoint as { bucket?: string }).bucket ?? i)}
-							{@const d = rawPoint as { bucket?: string }}
-							{@const isActive =
-								activeParticipationBucket !== null && d.bucket === activeParticipationBucket}
-							<Bar
-								class="lc-bars-bar"
-								data={d}
-								x={barProps.x}
-								y={barProps.y}
-								x1={barProps.x1}
-								y1={barProps.y1}
-								radius={barProps.radius}
-								rounded={barProps.rounded}
-								insets={barProps.insets}
-								fill={barProps.fill}
-								opacity={barProps.opacity ?? 1}
-								stroke="none"
-								strokeWidth={0}
-								style={isActive
-									? 'filter: drop-shadow(0 -1px 0 var(--foreground)) drop-shadow(1px 0 0 var(--foreground)) drop-shadow(-1px 0 0 var(--foreground));'
-									: undefined}
-							/>
-						{/each}
-					{/if}
+				{#snippet belowMarks()}
+					<Highlight data={activeParticipationDatum} area={{ class: 'fill-muted' }} />
 				{/snippet}
 				{#snippet tooltip()}
 					<Chart.Tooltip />
@@ -509,6 +495,7 @@
 				<BarChart
 					data={clanSizeBuckets}
 					x="bucket"
+					highlight={false}
 					bandPadding={0.3}
 					padding={chartPadding}
 					series={[
@@ -523,33 +510,8 @@
 						yAxis: { ...yAxisNoNumbers }
 					}}
 				>
-					{#snippet marks({ context, visibleSeries, getBarsProps })}
-						{#if visibleSeries.length}
-							{@const barProps = getBarsProps(visibleSeries[0], 0)}
-							{#each context.flatData as rawPoint, i ((rawPoint as { bucket?: string }).bucket ?? i)}
-								{@const d = rawPoint as { bucket?: string }}
-								{@const isActive =
-									activeClanSizeBucket !== null && d.bucket === activeClanSizeBucket}
-								<Bar
-									class="lc-bars-bar"
-									data={d}
-									x={barProps.x}
-									y={barProps.y}
-									x1={barProps.x1}
-									y1={barProps.y1}
-									radius={barProps.radius}
-									rounded={barProps.rounded}
-									insets={barProps.insets}
-									fill={barProps.fill}
-									opacity={barProps.opacity ?? 1}
-									stroke="none"
-									strokeWidth={0}
-									style={isActive
-										? 'filter: drop-shadow(0 -1px 0 var(--foreground)) drop-shadow(1px 0 0 var(--foreground)) drop-shadow(-1px 0 0 var(--foreground));'
-										: undefined}
-								/>
-							{/each}
-						{/if}
+					{#snippet belowMarks()}
+						<Highlight data={activeClanSizeDatum} area={{ class: 'fill-muted' }} />
 					{/snippet}
 					{#snippet tooltip()}
 						<Chart.Tooltip />

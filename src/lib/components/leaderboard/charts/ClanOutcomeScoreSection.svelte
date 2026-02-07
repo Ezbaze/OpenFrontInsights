@@ -2,7 +2,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Empty from '$lib/components/ui/empty';
-	import { Bar, BarChart, ScatterChart } from 'layerchart';
+	import { BarChart, Highlight, ScatterChart } from 'layerchart';
 	import type { ClanSession } from '$lib/types/openfront';
 	import { SvelteMap } from 'svelte/reactivity';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -56,6 +56,11 @@
 		}
 		return Array.from(map.values()).sort((a, b) => a.teams - b.teams);
 	});
+	const activeOutcomeDatum = $derived.by(() =>
+		activeOutcomeTeams === null
+			? undefined
+			: outcomesByTeamCount.find((entry) => entry.teams === activeOutcomeTeams)
+	);
 	const outcomesSummary = $derived.by(() => {
 		if (outcomesByTeamCount.length === 0) return null;
 		const totals = outcomesByTeamCount
@@ -148,6 +153,7 @@
 			<BarChart
 				data={outcomesByTeamCount}
 				x="teams"
+				highlight={false}
 				bandPadding={0.3}
 				seriesLayout="stack"
 				padding={chartPadding}
@@ -168,34 +174,8 @@
 					yAxis: { ...yAxisNoNumbers }
 				}}
 			>
-				{#snippet marks({ context, visibleSeries, getBarsProps })}
-					{#if visibleSeries.length}
-						{#each visibleSeries as series, seriesIndex (series.key)}
-							{@const barProps = getBarsProps(series, seriesIndex)}
-							{#each context.flatData as rawPoint, i ((rawPoint as { teams?: number }).teams ?? i)}
-								{@const d = rawPoint as { teams?: number }}
-								{@const isActive = activeOutcomeTeams !== null && d.teams === activeOutcomeTeams}
-								<Bar
-									class="lc-bars-bar"
-									data={d}
-									x={barProps.x}
-									y={barProps.y}
-									x1={barProps.x1}
-									y1={barProps.y1}
-									radius={barProps.radius}
-									rounded={barProps.rounded}
-									insets={barProps.insets}
-									fill={barProps.fill}
-									opacity={barProps.opacity ?? 1}
-									stroke="none"
-									strokeWidth={0}
-									style={isActive
-										? 'filter: drop-shadow(0 -1px 0 var(--foreground)) drop-shadow(1px 0 0 var(--foreground)) drop-shadow(-1px 0 0 var(--foreground));'
-										: undefined}
-								/>
-							{/each}
-						{/each}
-					{/if}
+				{#snippet belowMarks()}
+					<Highlight data={activeOutcomeDatum} area={{ class: 'fill-muted' }} />
 				{/snippet}
 				{#snippet tooltip()}
 					<Chart.Tooltip />
