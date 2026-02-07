@@ -104,8 +104,8 @@
 			return weightedWinsData.filter((entry) => hoverTags.includes(entry.clanTag));
 		}
 		if (activeWeightedWinsTag === null) return [];
-		const activeDatum = weightedWinsData.find((entry) => entry.clanTag === activeWeightedWinsTag);
-		return activeDatum ? [activeDatum] : [];
+		const match = weightedWinsData.find((entry) => entry.clanTag === activeWeightedWinsTag);
+		return match ? [match] : [];
 	});
 	const activeWinsLossesDatum = $derived.by(() =>
 		activeWinsLossesTag === null
@@ -170,9 +170,13 @@
 					}}
 				>
 					{#snippet belowMarks()}
-						{#each activeWeightedWinsData as activeDatum (activeDatum.clanTag)}
-							<Highlight data={activeDatum} area={{ class: 'fill-muted' }} />
-						{/each}
+						{#if activeWeightedWinsData.length > 0}
+							{#each activeWeightedWinsData as datum (datum.clanTag)}
+								<Highlight data={datum} area={{ class: 'fill-muted' }} />
+							{/each}
+						{:else}
+							<Highlight area={{ class: 'fill-muted' }} />
+						{/if}
 					{/snippet}
 					{#snippet aboveMarks({ context })}
 						{#if activeWeightedWinsValues && Array.isArray(context.xRange)}
