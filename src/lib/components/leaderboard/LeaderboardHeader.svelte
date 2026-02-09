@@ -12,6 +12,14 @@
 	import SunIcon from '@lucide/svelte/icons/sun';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { onMount } from 'svelte';
+	import { SvelteMap } from 'svelte/reactivity';
+	import {
+		addRecentlyViewed,
+		getRecentlyViewed,
+		setRecentlyViewedLabel,
+		type RecentlyViewedItem
+	} from '$lib/leaderboard/recently-viewed';
 
 	let {
 		renderDateRange,
@@ -27,45 +35,241 @@
 		onRefresh?: () => void;
 	}>();
 
+	type HeaderSuggestion = {
+		key: string;
+		value: string;
+		label: string;
+		description?: string;
+		kind: 'clan' | 'player';
+	};
+
+	type PlayerLookupResponse = {
+		playerId: string;
+		username: string | null;
+		globalName: string | null;
+	};
+
 	let searchOpen = $state(false);
 	let searchInputEl = $state<HTMLInputElement | null>(null);
 	let searchContentEl = $state<HTMLDivElement | null>(null);
 	let searchDropdownWidth = $state(0);
 	let ignoreSearchBlur = $state(false);
-	let focusFromPointer = $state(false);
+	let playerSuggestion = $state<HeaderSuggestion | null>(null);
+	let playerLookupLoading = $state(false);
+	let recentlyViewed = $state<RecentlyViewedItem[]>([]);
+	let playerLookupAbort: AbortController | null = null;
+	let playerLookupRequestId = 0;
+	const playerLookupCache = new SvelteMap<string, PlayerLookupResponse | null>();
+	const recentLabelLookupInFlight: Record<string, true> = Object.create(null);
 	const isDarkMode = $derived.by(() => (mode.current ? mode.current === 'dark' : true));
+	const recentlyViewedLimit = 8;
+	const sameRecentlyViewed = (left: RecentlyViewedItem[], right: RecentlyViewedItem[]) => {
+		if (left.length !== right.length) return false;
+		for (let index = 0; index < left.length; index += 1) {
+			const a = left[index];
+			const b = right[index];
+			if (a.kind !== b.kind || a.id !== b.id || a.label !== b.label || a.viewedAt !== b.viewedAt) {
+				return false;
+			}
+		}
+		return true;
+	};
 
-	const handleSuggestionSelect = (value: string) => {
-		search = value;
+	const updateRecentlyViewed = () => {
+		const next = getRecentlyViewed(recentlyViewedLimit);
+		if (!sameRecentlyViewed(recentlyViewed, next)) {
+			recentlyViewed = next;
+		}
+	};
+
+	const handleSuggestionSelect = (suggestion: HeaderSuggestion) => {
 		searchOpen = false;
-		navigateToClan(value);
+		if (suggestion.kind === 'player') {
+			navigateToPlayer(suggestion.value);
+			return;
+		}
+		navigateToClan(suggestion.value);
 	};
 
 	const normalizeClanTag = (value: string) => value.trim().replace(/^\[|\]$/g, '');
+	const playerIdPattern = /^[1-9A-HJ-NP-Za-km-z]{8}$/;
+
+	const isPlayerId = (value: string) => playerIdPattern.test(value.trim());
+
+	const toClanSuggestion = (value: string): HeaderSuggestion => ({
+		key: `clan:${value}`,
+		value,
+		label: value,
+		description: 'Clan',
+		kind: 'clan'
+	});
+	const toPlayerSuggestion = (payload: PlayerLookupResponse): HeaderSuggestion => {
+		const label = payload.globalName ?? payload.username ?? payload.playerId;
+		const descriptionName =
+			payload.globalName && payload.username && payload.globalName !== payload.username
+				? `@${payload.username}`
+				: payload.username
+					? `@${payload.username}`
+					: undefined;
+		return {
+			key: `player:${payload.playerId}`,
+			value: payload.playerId,
+			label,
+			description: descriptionName ? `Player ${descriptionName}` : 'Player',
+			kind: 'player'
+		};
+	};
+	const toRecentSuggestion = (item: RecentlyViewedItem): HeaderSuggestion => {
+		if (item.kind === 'clan') {
+			return {
+				key: `recent:clan:${item.id}`,
+				value: item.id,
+				label: item.id,
+				description: 'Recent clan',
+				kind: 'clan'
+			};
+		}
+
+		const label = String(item.label ?? '').trim() || item.id;
+		return {
+			key: `recent:player:${item.id}`,
+			value: item.id,
+			label,
+			description: 'Recent player',
+			kind: 'player'
+		};
+	};
+
+	const resolveRecentPlayerLabel = async (playerId: string) => {
+		const id = playerId.trim();
+		if (!id || recentLabelLookupInFlight[id]) return;
+		recentLabelLookupInFlight[id] = true;
+
+		try {
+			let payload = playerLookupCache.get(id);
+			if (payload === undefined) {
+				const response = await fetch(`/api/players/${encodeURIComponent(id)}/lookup`);
+				if (!response.ok) {
+					if (response.status === 404) {
+						playerLookupCache.set(id, null);
+					}
+					return;
+				}
+				payload = (await response.json()) as PlayerLookupResponse;
+				playerLookupCache.set(id, payload);
+			}
+
+			const username = payload?.username?.trim();
+			if (!username) return;
+			const update = setRecentlyViewedLabel(
+				{ kind: 'player', id, label: username },
+				recentlyViewedLimit
+			);
+			if (update.changed) {
+				recentlyViewed = update.items;
+			}
+		} catch (err) {
+			console.error(`Failed to resolve recent player username for ${id}`, err);
+		} finally {
+			delete recentLabelLookupInFlight[id];
+		}
+	};
 
 	const navigateToClan = (value: string) => {
 		const cleaned = normalizeClanTag(value);
 		if (!cleaned) return;
 		const tag = cleaned.toUpperCase();
-		search = tag;
+		recentlyViewed = addRecentlyViewed({ kind: 'clan', id: tag, label: tag }, recentlyViewedLimit);
 		searchOpen = false;
 		void goto(resolve(`/clans/${encodeURIComponent(tag)}`));
 	};
 
-	const openSearch = () => {
-		searchOpen = true;
+	const navigateToPlayer = (value: string) => {
+		const cleaned = value.trim();
+		if (!cleaned) return;
+		const cachedPlayer = playerLookupCache.get(cleaned) ?? null;
+		const playerLabel = cachedPlayer?.username?.trim() || null;
+		if (playerLabel) {
+			recentlyViewed = addRecentlyViewed(
+				{ kind: 'player', id: cleaned, label: playerLabel },
+				recentlyViewedLimit
+			);
+		}
+		searchOpen = false;
+		void goto(resolve(`/players/${encodeURIComponent(cleaned)}`));
 	};
 
-	const handleSearchPointerDown = () => {
-		focusFromPointer = true;
+	const navigateFromSearch = (value: string) => {
+		if (isPlayerId(value)) {
+			navigateToPlayer(value);
+			return;
+		}
+		navigateToClan(value);
+	};
+
+	const resolvePlayerSuggestion = (playerId: string, payload: PlayerLookupResponse | null) => {
+		if (search.trim() !== playerId) return;
+		playerSuggestion = payload ? toPlayerSuggestion(payload) : null;
+	};
+
+	const lookupPlayerSuggestion = async (playerId: string) => {
+		const trimmed = playerId.trim();
+		if (!isPlayerId(trimmed)) {
+			playerSuggestion = null;
+			playerLookupLoading = false;
+			return;
+		}
+
+		const cached = playerLookupCache.get(trimmed);
+		if (cached !== undefined) {
+			resolvePlayerSuggestion(trimmed, cached);
+			playerLookupLoading = false;
+			return;
+		}
+
+		playerLookupRequestId += 1;
+		const requestId = playerLookupRequestId;
+		playerLookupAbort?.abort();
+		const controller = new AbortController();
+		playerLookupAbort = controller;
+		playerLookupLoading = true;
+
+		try {
+			const response = await fetch(`/api/players/${encodeURIComponent(trimmed)}/lookup`, {
+				signal: controller.signal
+			});
+			if (!response.ok) {
+				if (response.status === 404) {
+					playerLookupCache.set(trimmed, null);
+					resolvePlayerSuggestion(trimmed, null);
+					return;
+				}
+				throw new Error(`Player lookup failed ${response.status}`);
+			}
+			const payload = (await response.json()) as PlayerLookupResponse;
+			if (requestId !== playerLookupRequestId) return;
+			playerLookupCache.set(trimmed, payload);
+			resolvePlayerSuggestion(trimmed, payload);
+		} catch (err) {
+			if (controller.signal.aborted || requestId !== playerLookupRequestId) return;
+			console.error(`Failed to lookup player id ${trimmed}`, err);
+			playerLookupCache.set(trimmed, null);
+			resolvePlayerSuggestion(trimmed, null);
+		} finally {
+			if (requestId === playerLookupRequestId) {
+				playerLookupLoading = false;
+			}
+		}
+	};
+
+	const openSearch = () => {
+		updateRecentlyViewed();
+		searchOpen = true;
 	};
 
 	const handleSearchFocus = () => {
 		updateSearchDropdownWidth();
-		if (!focusFromPointer) {
-			openSearch();
-		}
-		focusFromPointer = false;
+		openSearch();
 	};
 
 	const handleSearchBlur = () => {
@@ -87,7 +291,7 @@
 
 	const handleSearchTab = (event: KeyboardEvent) => {
 		if (event.key !== 'Tab' || event.shiftKey) return;
-		if (searchSuggestions.length === 0) return;
+		if (activeSuggestions.length === 0) return;
 		event.preventDefault();
 		if (!searchOpen) openSearch();
 		ignoreSearchBlur = true;
@@ -99,7 +303,7 @@
 	const handleSearchKeydown = (event: KeyboardEvent) => {
 		if (event.key === 'Enter') {
 			event.preventDefault();
-			navigateToClan(search);
+			navigateFromSearch(search);
 			return;
 		}
 		handleSearchTab(event);
@@ -125,12 +329,59 @@
 		}
 	};
 
+	const normalizedSuggestions = $derived.by(() => {
+		const clanSuggestions: HeaderSuggestion[] = searchSuggestions.map(toClanSuggestion);
+		const selectedPlayer = playerSuggestion;
+		if (!selectedPlayer) return clanSuggestions;
+		if (
+			clanSuggestions.some((suggestion: HeaderSuggestion) => suggestion.key === selectedPlayer.key)
+		) {
+			return clanSuggestions;
+		}
+		return [selectedPlayer, ...clanSuggestions];
+	});
+	const searchTerm = $derived.by(() => search.trim());
+	const recentSuggestions = $derived.by(() =>
+		searchTerm === '' ? recentlyViewed.map(toRecentSuggestion) : []
+	);
+	const showingRecentSuggestions = $derived.by(() => searchTerm === '' && recentSuggestions.length > 0);
+	const activeSuggestions = $derived.by(() =>
+		showingRecentSuggestions ? recentSuggestions : normalizedSuggestions
+	);
+
+	onMount(() => {
+		updateRecentlyViewed();
+	});
+
+	$effect(() => {
+		for (const item of recentlyViewed) {
+			if (item.kind !== 'player') continue;
+			if (item.label.trim() !== item.id) continue;
+			void resolveRecentPlayerLabel(item.id);
+		}
+	});
+
 	$effect(() => {
 		updateSearchDropdownWidth();
 		if (!searchInputEl || !('ResizeObserver' in window)) return;
 		const observer = new ResizeObserver(() => updateSearchDropdownWidth());
 		observer.observe(searchInputEl);
 		return () => observer.disconnect();
+	});
+
+	$effect(() => {
+		const target = search.trim();
+		if (!isPlayerId(target)) {
+			playerLookupAbort?.abort();
+			playerLookupLoading = false;
+			playerSuggestion = null;
+			return;
+		}
+
+		const timeoutId = setTimeout(() => {
+			void lookupPlayerSuggestion(target);
+		}, 150);
+		return () => clearTimeout(timeoutId);
 	});
 </script>
 
@@ -211,16 +462,15 @@
 							type="text"
 							autocomplete="off"
 							class="w-full md:w-56"
-							placeholder="Jump to clan tag"
+							placeholder="Jump to clan tag or player id"
 							role="combobox"
 							aria-autocomplete="list"
-							aria-label="Jump to clan tag"
+							aria-label="Jump to clan tag or player id"
 							aria-controls="search-clan-suggestions"
 							aria-expanded={searchOpen}
 							aria-haspopup="listbox"
 							bind:value={search}
 							bind:ref={searchInputEl}
-							onpointerdown={handleSearchPointerDown}
 							onfocus={handleSearchFocus}
 							oninput={openSearch}
 							onblur={handleSearchBlur}
@@ -243,16 +493,28 @@
 								tabindex="-1"
 								onkeydown={handleSuggestionKeydown}
 							>
-								{#if searchSuggestions.length === 0}
+								{#if activeSuggestions.length === 0}
 									<div
 										role="status"
 										aria-live="polite"
 										class="px-2 py-1.5 text-sm text-muted-foreground"
 									>
-										No clans found.
+										{#if playerLookupLoading}
+											Checking player id...
+										{:else}
+											No matches found.
+										{/if}
 									</div>
 								{:else}
-									{#each searchSuggestions as suggestion, idx (suggestion + idx)}
+									{#if showingRecentSuggestions}
+										<div class="px-2 py-1 text-xs font-medium text-muted-foreground">
+											<span class="inline-flex items-center gap-1">
+												<ClockIcon class="size-3.5" />
+												Recently viewed
+											</span>
+										</div>
+									{/if}
+									{#each activeSuggestions as suggestion, idx (suggestion.key)}
 										<button
 											type="button"
 											role="option"
@@ -267,7 +529,10 @@
 												}
 											}}
 										>
-											<span>{suggestion}</span>
+											<span>{suggestion.label}</span>
+											{#if suggestion.description}
+												<span class="text-xs text-muted-foreground">{suggestion.description}</span>
+											{/if}
 										</button>
 									{/each}
 								{/if}

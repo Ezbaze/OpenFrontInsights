@@ -13,6 +13,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { onMount, tick } from 'svelte';
 	import { toast } from 'svelte-sonner';
+	import { addRecentlyViewed } from '$lib/leaderboard/recently-viewed';
 	import {
 		displayNumber,
 		displayPercent,
@@ -301,6 +302,7 @@
 		if (!browser || !sessionsMounted) return;
 		const clanTag = data.clanTag;
 		const reloadToken = data.loadedAt;
+		addRecentlyViewed({ kind: 'clan', id: clanTag, label: clanTag.toUpperCase() });
 		void reloadToken;
 		void loadAllSessions(clanTag, data.clanSessions ?? []);
 	});

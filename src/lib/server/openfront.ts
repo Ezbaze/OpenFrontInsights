@@ -1,3 +1,5 @@
+import { error } from '@sveltejs/kit';
+
 const API_BASE = 'https://api.openfront.io/public';
 
 type Fetch = typeof fetch;
@@ -15,7 +17,7 @@ async function fetchJson<T>(fetcher: Fetch, url: string): Promise<T> {
 	});
 
 	if (!response.ok) {
-		throw new Error(`OpenFront API error: ${response.status}`);
+		throw error(response.status, response.statusText || 'OpenFront API request failed.');
 	}
 
 	return (await response.json()) as T;
@@ -42,4 +44,12 @@ export function fetchClanSessions(
 		fetcher,
 		withQuery(`${API_BASE}/clan/${encodeURIComponent(clanTag)}/sessions`, query)
 	);
+}
+
+export function fetchPlayerProfile(fetcher: Fetch, playerId: string) {
+	return fetchJson(fetcher, `${API_BASE}/player/${encodeURIComponent(playerId)}`);
+}
+
+export function fetchPlayerSessions(fetcher: Fetch, playerId: string) {
+	return fetchJson(fetcher, `${API_BASE}/player/${encodeURIComponent(playerId)}/sessions`);
 }

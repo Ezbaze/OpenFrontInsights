@@ -49,3 +49,48 @@ export type ClanSession = {
 	score?: number;
 	[key: string]: unknown;
 };
+
+export type PlayerStatsLeaf = {
+	wins: string;
+	losses: string;
+	total: string;
+	stats?: unknown;
+};
+
+export type PlayerStatsTree = Record<string, Record<string, Record<string, PlayerStatsLeaf>>>;
+
+export type PlayerGame = {
+	gameId: string;
+	start: string;
+	mode: string;
+	type: string;
+	map: string;
+	difficulty: string;
+	clientId?: string;
+};
+
+export type PlayerProfile = {
+	createdAt: string;
+	user?: {
+		id: string;
+		avatar?: string | null;
+		username: string;
+		global_name?: string | null;
+		discriminator?: string;
+	};
+	games: PlayerGame[];
+	stats: PlayerStatsTree;
+};
+
+export type PlayerSession = {
+	gameId?: string;
+	gameStart?: string;
+	gameEnd?: string;
+	gameType?: string;
+	gameMode?: string;
+	clientId?: string;
+	username?: string;
+	clanTag?: string | null;
+	hasWon?: boolean;
+	[key: string]: unknown;
+};
